@@ -41,6 +41,22 @@ test('初期化と参加登録', () => {
   assert.equal(evaluateRead(RULES, db, 'members', auth(null)), false);
 });
 
+test('チーム内での代表者決め（pick）', () => {
+  ok(w('u1', { 'pick/A': 'u1' }), '自分のチームに自分を立候補');
+  ok(w('u2', { 'pick/A': 'u2' }), '同じチームの別の人に交代');
+  ng(w('u1', { 'pick/A': null }), '他人の立候補は取り消せない');
+  ok(w('u2', { 'pick/A': null }), '本人は辞退できる');
+  ng(w('u1', { 'pick/B': 'u1' }), '他チームには立候補できない');
+  ng(w('u1', { 'pick/A': 'u2' }), '他人を勝手に指名できない');
+  ng(w('u3', { 'pick/A': 'u3' }), 'Bチームの人はAの代表になれない');
+  ng(w(ADMIN, { 'pick/A': 'u3' }), '管理者でも他チームの人は指定できない');
+  ok(w(ADMIN, { 'pick/B': 'u3' }), '管理者は緊急指定できる');
+  ok(w('u1', { 'pick/A': 'u1' }), '再立候補');
+  ok(w(ADMIN, { 'state/phase': 'ready' }), '発表');
+  ng(w('u2', { 'pick/A': 'u2' }), '発表後は変更不可');
+  ok(w(ADMIN, { 'state/phase': 'lobby', pick: null }), '戻す');
+});
+
 test('代表者・提出・二重送信', () => {
   ok(w(ADMIN, { 'state/phase': 'ready', 'state/runId': 'run1', 'state/reps': { A: 'u1', B: 'u3' }, 'state/repOf': { u1: 'A', u3: 'B' } }), '代表者発表');
   ng(w('u2', { 'state/reps/A': 'u2' }), '参加者は代表を変えられない');

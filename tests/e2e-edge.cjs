@@ -37,7 +37,14 @@ const uidOf = p => p.evaluate(() => { for (let i = 0; i < sessionStorage.length;
   // 居合斬り
   await admin.selectOption('#gameSel', 'iai');
   await sleep(300);
-  await admin.click('[data-act="autoReps"]'); await sleep(200);
+  // 立候補→交代→辞退→再立候補
+  await P.A.p.click('#pickBtn'); await sleep(300);
+  check((await get('pick/A')) === P.A.uid, 'A: 立候補できる');
+  await P.A.p.click('#unpickBtn'); await sleep(300);
+  check(!(await get('pick/A')), 'A: 辞退できる');
+  for (const t of TEAMS) { await P[t].p.click('#pickBtn'); }
+  await sleep(500);
+  check((await admin.textContent('#tabBody')).includes('5/5 チーム決定'), '管理画面に全チーム決定が表示');
   await admin.click('[data-act="announce"]'); await sleep(500);
   for (const t of TEAMS) await P[t].p.click('#okBtn');
   await sleep(300);

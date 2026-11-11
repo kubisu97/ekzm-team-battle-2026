@@ -80,9 +80,16 @@ async function shot(p, name) { await p.screenshot({ path: `${SHOTS}/${name}.png`
   }
 
   for (let round = 1; round <= 4; round++) {
-    await admin.waitForSelector('[data-act="autoReps"]');
-    await admin.click('[data-act="autoReps"]');
-    await sleep(300);
+    await admin.waitForSelector('[data-act="announce"]');
+    // 各チームで1人が「わたしが出る！」を押す（2巡目以降は出場済みなので確認ダイアログ→OK）
+    for (let t = 0; t < 5; t++) {
+      const pl = players[((round - 1) % 2) * 5 + t];
+      await pl.p.waitForSelector('#pickBtn');
+      if (round === 1 && t === 0) await shot(pl.p, `r${round}-a0-pick`);
+      await pl.p.click('#pickBtn');
+    }
+    await sleep(600);
+    await shot(players[0].p, `r${round}-a1-picked`);
     const game = await admin.$eval('#gameSel', s => s.value);
     if (game === 'quiz') { await admin.click('[data-act="autoQuiz"]'); await sleep(300); }
     await shot(admin, `r${round}-a-select`);
