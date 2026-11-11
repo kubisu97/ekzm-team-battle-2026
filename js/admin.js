@@ -10,12 +10,12 @@ let be = null;
 let authed = false;
 const D = {
   state: undefined, config: null, members: {}, slots: {}, results: {}, adjust: {}, used: {}, online: {},
-  quizBank: {}, prog: {}, live: {}, subs: {}, quizRun: null,
+  quizBank: {}, pick: {}, prog: {}, live: {}, subs: {}, quizRun: null,
 };
 let runWatch = { runId: null, offs: [] };
 let tab = 'control';
 try { tab = sessionStorage.getItem('ekzm-admin-tab') || 'control'; } catch { /* noop */ }
-const draft = { game: null, mult: null, reps: {}, quizCount: L.QUIZ_DEFAULT_COUNT, quizPick: [], overrides: {}, forRound: null };
+const draft = { quizCount: L.QUIZ_DEFAULT_COUNT, quizPick: [], overrides: {}, forRound: null };
 let editRound = null;
 let editQuizId = null;
 let renderQueued = false;
@@ -87,7 +87,7 @@ function renderLogin() {
 // ---------- データ購読 ----------
 function startWatching() {
   root.innerHTML = `<section class="card center"><div class="spinner"></div><p>データ読み込み中…</p></section>`;
-  const keys = { state: 'state', config: 'config', members: 'members', slots: 'slots', results: 'results', adjust: 'adjust', used: 'used', online: 'online', quizBank: 'quizBank' };
+  const keys = { state: 'state', config: 'config', members: 'members', slots: 'slots', results: 'results', adjust: 'adjust', used: 'used', online: 'online', quizBank: 'quizBank', pick: 'pick' };
   for (const [k, path] of Object.entries(keys)) {
     be.watch(path, v => {
       D[k] = k === 'state' ? (v ?? null) : (v || (k === 'config' ? null : {}));
@@ -187,9 +187,6 @@ function controlTab() {
   const st = D.state;
   if (draft.forRound !== st.round + ':' + st.phase && st.phase === 'lobby') {
     draft.forRound = st.round + ':' + st.phase;
-    draft.game = st.game || L.ROUND_GAMES[st.round - 1];
-    draft.mult = Number(st.mult) || L.DEFAULT_MULT[st.round - 1];
-    draft.reps = { ...(st.reps || {}) };
     draft.overrides = {};
   }
   switch (st.phase) {
@@ -202,35 +199,58 @@ function controlTab() {
   }
 }
 
+/** 各チームが自分たちで決めた代表者（pick/{team}）。チーム外・退出者は無効 */
+function validPick(t) {
+  const u = D.pick?.[t];
+  return u && D.members?.[u]?.team === t ? u : null;
+}
+
 function lobbyPanel(st) {
-  const g = draft.game;
+  const g = st.game || L.ROUND_GAMES[st.round - 1];
+  const mult = Number(st.mult) || 1;
   const bank = Object.entries(D.quizBank || {});
   const pickedOk = g !== 'quiz' || draft.quizPick.filter(id => D.quizBank?.[id]).length === Number(draft.quizCount);
-  const allReps = L.TEAMS.every(t => draft.reps[t] && D.members?.[draft.reps[t]]?.team === t);
+  const teamsWithMembers = L.TEAMS.filter(t => membersOf(t).length);
+  const decided = teamsWithMembers.filter(t => validPick(t));
+  const allDecided = teamsWithMembers.length > 0 && decided.length === teamsWithMembers.length;
   return `
   <section class="card">
-    <div class="card-head"><h2>① ゲームと代表者を選ぶ</h2></div>
+    <div class="card-head"><h2>① 次のゲーム</h2></div>
     <div class="grid2">
       <label class="lbl">ゲーム<select class="input" id="gameSel">${L.ROUND_GAMES.map(k => `<option value="${k}" ${g === k ? 'selected' : ''}>${L.GAMES[k].icon} ${L.GAMES[k].title}</option>`).join('')}</select></label>
-      <label class="lbl">得点倍率<select class="input" id="multSel"><option value="1" ${draft.mult === 1 ? 'selected' : ''}>×1</option><option value="2" ${draft.mult === 2 ? 'selected' : ''}>×2（最終ゲーム）</option></select></label>
+      <label class="lbl">得点倍率<select class="input" id="multSel"><option value="1" ${mult === 1 ? 'selected' : ''}>×1</option><option value="2" ${mult === 2 ? 'selected' : ''}>×2（最終ゲーム）</option></select></label>
     </div>
     <p class="note">${esc(L.GAMES[g].rule)}</p>
-    <div class="card-head"><h3>各チームの代表者</h3><button class="btn btn-sm" data-act="autoReps">🎲 未出場からおまかせ</button></div>
-    <div class="rep-pick">${L.TEAMS.map(t => {
-      const ms = membersOf(t);
-      const sel = draft.reps[t] || '';
-      return `<div class="rp-row" style="${tvars(t)}">${teamBadge(t)}
-        <select class="input rep-sel" data-team="${t}"><option value="">— 選択 —</option>${ms.map(m => `<option value="${m.uid}" ${sel === m.uid ? 'selected' : ''}>${esc(m.name)}${D.used?.[m.uid] ? `（${usedRounds(m.uid)}出場済）` : ''}</option>`).join('')}</select>
-        <small class="muted">未出場 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}</small></div>`;
-    }).join('')}</div>
     ${g === 'quiz' ? `
       <div class="card-head"><h3>出題する問題</h3>
         <span class="row"><select class="input input-sm" id="qCount">${Array.from({ length: L.QUIZ_MAX_COUNT }, (_, i) => `<option ${Number(draft.quizCount) === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>問
         <button class="btn btn-sm" data-act="autoQuiz">🎲 未使用から選ぶ</button></span></div>
       ${bank.length ? `<ol class="qpick">${bank.map(([id, q]) => `<li><label><input type="checkbox" class="qp" value="${id}" ${draft.quizPick.includes(id) ? 'checked' : ''}> ${esc(q.text)} ${q.used ? '<small class="played">使用済</small>' : ''}</label></li>`).join('')}</ol>` : '<p class="note warn">問題がありません。「❓ クイズ」タブで問題を登録してください。</p>'}
       <p class="muted">選択中：${draft.quizPick.filter(id => D.quizBank?.[id]).length} / ${draft.quizCount}問（選んだ順に出題）</p>` : ''}
-    <button class="btn btn-primary btn-xl" data-act="announce" ${pickedOk ? '' : 'disabled'}>代表者を発表する ▶</button>
-    ${allReps ? '' : '<p class="fine warn">※ 代表者が未選択のチームがあります（そのチームは不参加で進行できます）</p>'}
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>② 代表者（各チームが決定）</h2><span class="chip ${allDecided ? 'ok' : 'warn'}">${decided.length}/${teamsWithMembers.length} チーム決定</span></div>
+    <p class="fine">参加者のスマホに「✋ わたしが出る！」ボタンが出ています。チームで相談して、出る人が自分で押します。</p>
+    <ul class="pick-admin">${L.TEAMS.map(t => {
+      const u = validPick(t);
+      const ms = membersOf(t);
+      return `<li style="${tvars(t)}">${teamBadge(t)}<b>${u ? esc(nameOf(u)) : '<span class="muted">相談中…</span>'}</b>
+        ${u ? (D.used?.[u] ? `<small class="warn">${usedRounds(u)}出場済</small>` : '<small class="ok">未出場</small>') : ''}
+        <small class="muted">未出場 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}人</small></li>`;
+    }).join('')}</ul>
+    <button class="btn btn-primary btn-xl" data-act="announce" ${pickedOk && decided.length ? '' : 'disabled'}>代表者を発表する ▶</button>
+    ${allDecided ? '' : '<p class="fine warn">※ まだ決まっていないチームがあります。全チーム決まってから発表してください（未定のまま発表すると、そのチームは不参加になります）。</p>'}
+    <details class="emergency"><summary>緊急用：司会者が代わりに指定する</summary>
+      <p class="fine">欠席・通信トラブルなどでチームが決められないときだけ使います。指定するとそのチームのスマホにも反映されます。</p>
+      <div class="rep-pick">${L.TEAMS.map(t => {
+        const ms = membersOf(t);
+        const sel = validPick(t) || '';
+        return `<div class="rp-row" style="${tvars(t)}">${teamBadge(t)}
+          <select class="input rep-sel" data-team="${t}"><option value="">— 未定 —</option>${ms.map(m => `<option value="${m.uid}" ${sel === m.uid ? 'selected' : ''}>${esc(m.name)}${D.used?.[m.uid] ? `（${usedRounds(m.uid)}出場済）` : ''}</option>`).join('')}</select>
+          <small class="muted">未出場 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}</small></div>`;
+      }).join('')}</div>
+      <button class="btn btn-sm" data-act="autoReps">🎲 未定のチームを未出場者からおまかせで埋める</button>
+    </details>
   </section>
   ${scoreboardHTML(D.results, D.adjust, { compact: true })}`;
 }
@@ -456,13 +476,21 @@ function setupTab() {
 
 // ---------- イベント ----------
 function afterRender() {
-  $$('.rep-sel').forEach(s => s.addEventListener('change', () => {
+  $$('.rep-sel').forEach(s => s.addEventListener('change', async () => {
     const t = s.dataset.team;
-    if (s.value && D.used?.[s.value] && !confirm(`${nameOf(s.value)} さんはすでに出場済みです。それでも代表にしますか？`)) { s.value = draft.reps[t] || ''; return; }
-    draft.reps[t] = s.value || null;
+    if (s.value && D.used?.[s.value] && !confirm(`${nameOf(s.value)} さんはすでに出場済みです。それでも代表にしますか？`)) { s.value = validPick(t) || ''; return; }
+    s.blur();
+    try { await be.set(`pick/${t}`, s.value || null); } catch (e) { toast(errMsg(e), 'error'); }
   }));
-  $('#gameSel')?.addEventListener('change', e => { draft.game = e.target.value; draft.mult = L.DEFAULT_MULT[L.ROUND_GAMES.indexOf(draft.game)] || 1; queueRender(); e.target.blur(); });
-  $('#multSel')?.addEventListener('change', e => { draft.mult = Number(e.target.value); e.target.blur(); queueRender(); });
+  // ゲーム・倍率は参加者の待機画面にもすぐ表示する（代表者決めの参考になる）
+  $('#gameSel')?.addEventListener('change', async e => {
+    const g = e.target.value; e.target.blur();
+    try { await be.update({ 'state/game': g, 'state/updatedAt': be.TS }); } catch (err) { toast(errMsg(err), 'error'); }
+  });
+  $('#multSel')?.addEventListener('change', async e => {
+    const m = Number(e.target.value); e.target.blur();
+    try { await be.update({ 'state/mult': m, 'state/updatedAt': be.TS }); } catch (err) { toast(errMsg(err), 'error'); }
+  });
   $('#qCount')?.addEventListener('change', e => { draft.quizCount = Number(e.target.value); e.target.blur(); queueRender(); });
   $$('.qp').forEach(cb => cb.addEventListener('change', () => {
     if (cb.checked) { if (!draft.quizPick.includes(cb.value)) draft.quizPick.push(cb.value); } else draft.quizPick = draft.quizPick.filter(x => x !== cb.value);
@@ -489,15 +517,19 @@ root.addEventListener('click', async e => {
 const newRunId = () => 'run' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 const ACTIONS = {
-  autoReps() {
+  async autoReps() {
+    const up = {};
     for (const t of L.TEAMS) {
+      if (validPick(t)) continue;
       const ms = membersOf(t);
       if (!ms.length) continue;
       const fresh = ms.filter(m => !D.used?.[m.uid]);
       const pool = fresh.length ? fresh : ms;
-      draft.reps[t] = pool[Math.floor(Math.random() * pool.length)].uid;
+      up[`pick/${t}`] = pool[Math.floor(Math.random() * pool.length)].uid;
     }
-    queueRender();
+    if (!Object.keys(up).length) { toast('未定のチームはありません', 'info'); return; }
+    if (!confirm(`未定の ${Object.keys(up).length} チームを、未出場者からランダムに指定します。よろしいですか？`)) return;
+    await be.update(up);
   },
   autoQuiz() {
     const all = Object.entries(D.quizBank || {});
@@ -510,18 +542,18 @@ const ACTIONS = {
     const st = D.state;
     const reps = {}, repOf = {};
     for (const t of L.TEAMS) {
-      const u = draft.reps[t];
-      if (u && D.members?.[u]?.team === t) { reps[t] = u; repOf[u] = t; }
+      const u = validPick(t);
+      if (u) { reps[t] = u; repOf[u] = t; }
     }
     const n = Object.keys(reps).length;
     if (!n) throw new Error('代表者を1人以上選んでください');
     if (n < 5 && !confirm(`代表者が${n}チーム分しか選ばれていません。このまま進めますか？`)) return;
     const runId = newRunId();
     const up = {
-      'state/phase': 'ready', 'state/game': draft.game, 'state/mult': draft.mult, 'state/reps': reps, 'state/repOf': repOf,
+      'state/phase': 'ready', 'state/reps': reps, 'state/repOf': repOf,
       'state/runId': runId, 'state/startAt': 0, 'state/iaiDelay': 0, 'state/revealAt': 0, 'state/updatedAt': be.TS, 'state/quiz': null,
     };
-    if (draft.game === 'quiz') {
+    if (st.game === 'quiz') {
       const ids = draft.quizPick.filter(id => D.quizBank?.[id]).slice(0, draft.quizCount);
       if (ids.length !== Number(draft.quizCount)) throw new Error(`問題を${draft.quizCount}問選んでください`);
       up[`adminOnly/quizRun/${runId}`] = ids.map(id => ({ id, text: D.quizBank[id].text, choices: L.arr(D.quizBank[id].choices), answer: Number(D.quizBank[id].answer) }));
@@ -619,8 +651,9 @@ const ACTIONS = {
   async next() {
     const st = D.state;
     const r = st.round + 1;
-    draft.forRound = null; draft.reps = {}; draft.quizPick = [];
+    draft.forRound = null; draft.quizPick = [];
     await be.update({
+      pick: null,
       state: { round: r, game: L.ROUND_GAMES[r - 1], mult: L.DEFAULT_MULT[r - 1], phase: 'lobby', startAt: 0, iaiDelay: 0, revealAt: 0, updatedAt: be.TS },
     });
   },
@@ -657,7 +690,9 @@ const ACTIONS = {
     if (!m) return;
     if (D.state?.repOf?.[u] && D.state.phase !== 'lobby') throw new Error('現在の代表者は削除できません');
     if (!confirm(`${m.name}（${m.team}チーム）を削除しますか？ 本人は名前とチームを選び直せます。`)) return;
-    await be.update({ [`members/${u}`]: null, [`slots/${m.team}/${m.slot}`]: null });
+    const up = { [`members/${u}`]: null, [`slots/${m.team}/${m.slot}`]: null };
+    if (D.pick?.[m.team] === u) up[`pick/${m.team}`] = null;
+    await be.update(up);
   },
   async unuse(b) {
     if (!confirm(`${nameOf(b.dataset.uid)} さんの出場履歴を解除しますか？（得点は変わりません）`)) return;
@@ -717,18 +752,18 @@ const ACTIONS = {
   async resetScores() {
     if (!confirm('得点・結果・出場履歴をすべて消して GAME 1 からやり直します。参加者の登録は残ります。よろしいですか？')) return;
     if (prompt('確認のため「リセット」と入力してください') !== 'リセット') return;
-    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, state: initialState() };
+    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, pick: null, state: initialState() };
     for (const id of Object.keys(D.quizBank || {})) up[`quizBank/${id}/used`] = false;
-    draft.forRound = null; draft.reps = {}; draft.quizPick = [];
+    draft.forRound = null; draft.quizPick = [];
     await be.update(up);
     toast('得点と履歴をリセットしました', 'ok');
   },
   async resetAll() {
     if (!confirm('参加者も含めて全データを初期化します（クイズ問題は残ります）。参加者は登録からやり直しになります。よろしいですか？')) return;
     if (prompt('確認のため「初期化」と入力してください') !== '初期化') return;
-    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, members: null, slots: null, online: null, state: initialState(), config: defaultConfig(Number(D.config?.teamCap) || 5) };
+    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, pick: null, members: null, slots: null, online: null, state: initialState(), config: defaultConfig(Number(D.config?.teamCap) || 5) };
     for (const id of Object.keys(D.quizBank || {})) up[`quizBank/${id}/used`] = false;
-    draft.forRound = null; draft.reps = {}; draft.quizPick = [];
+    draft.forRound = null; draft.quizPick = [];
     await be.update(up);
     toast('全データを初期化しました', 'ok');
   },

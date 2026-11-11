@@ -41,7 +41,19 @@ class Bot {
   clear() { this.timers.forEach(clearTimeout); this.timers = []; }
   at(serverT, fn) { this.timers.push(setTimeout(fn, Math.max(0, serverT - this.be.serverNow()))); }
   onState(st) {
-    if (!st || !st.repOf?.[this.uid]) { if (this.status.startsWith('代表')) this.status = '観戦'; paint(); return; }
+    if (!st) return;
+    if (st.phase !== this.lastPhase) { this.clear(); this.lastPhase = st.phase; }
+    // 待機中：自分のチームの代表が未定で、自分が未出場なら少し待ってから立候補（人間の参加者が先に押せるよう間を空ける）
+    if (st.phase === 'lobby' && autoNominate() && !this.done.has('pick:' + st.round)) {
+      this.done.add('pick:' + st.round);
+      this.timers.push(setTimeout(async () => {
+        try {
+          const [cur, used] = await Promise.all([this.be.get('pick/' + this.team), this.be.get('used/' + this.uid)]);
+          if (!cur && !used) { await this.be.set('pick/' + this.team, this.uid); this.status = '立候補した'; log(`${this.name} が ${this.team}チームの代表に立候補`); paint(); }
+        } catch (e) { log(`${this.name} 立候補失敗: ${errMsg(e)}`, 'ng'); }
+      }, 6000 + Math.random() * 9000));
+    }
+    if (!st.repOf?.[this.uid] || st.phase === 'lobby') { if (this.status.startsWith('代表')) this.status = '観戦'; paint(); return; }
     const run = st.runId;
     if (st.phase === 'ready' && !this.done.has(run + ':ok')) {
       this.done.add(run + ':ok'); this.status = '代表(準備OK)';
@@ -65,7 +77,6 @@ class Bot {
         this.play(st);
       }
     }
-    if (st.phase !== 'running' && st.phase !== 'ready') this.clear();
     paint();
   }
   async submit(run, key, payload) {
@@ -100,6 +111,8 @@ class Bot {
     }
   }
 }
+
+function autoNominate() { return !!document.querySelector('#autoPick')?.checked; }
 
 function paint() {
   $('#bots').innerHTML = bots.length

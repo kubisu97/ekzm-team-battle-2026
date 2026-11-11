@@ -16,7 +16,7 @@ const app = $('#app');
 let be = null;
 let uid = null;
 const S = {
-  state: undefined, config: undefined, members: undefined, slots: {}, results: {}, adjust: {}, used: {},
+  state: undefined, config: undefined, members: undefined, slots: {}, results: {}, adjust: {}, used: {}, pick: {},
   prog: {}, live: {}, mine: {}, runLoaded: false,
 };
 let view = { key: null, ctl: null };
@@ -54,7 +54,7 @@ async function boot() {
 }
 
 function subscribe() {
-  const keys = ['state', 'config', 'members', 'slots', 'results', 'adjust', 'used'];
+  const keys = ['state', 'config', 'members', 'slots', 'results', 'adjust', 'used', 'pick'];
   for (const k of keys) {
     be.watch(k, v => {
       S[k] = v ?? (k === 'state' || k === 'config' || k === 'members' ? null : {});
@@ -212,24 +212,61 @@ function mountJoin() {
 }
 
 // ---------- ロビー ----------
+function pickButtonsHTML(myPick, played, busy) {
+  const dis = busy ? 'disabled' : '';
+  if (myPick === uid) {
+    return `<p class="center">🔥 あなたが代表！ 司会者の発表を待とう。</p><button class="btn btn-ghost" id="unpickBtn" ${dis}>辞退する</button>`;
+  }
+  if (myPick) return `<button class="btn btn-ghost" id="pickBtn" ${dis}>✋ 代わりにわたしが出る</button>`;
+  return `<button class="btn btn-primary btn-xl" id="pickBtn" ${dis}>✋ わたしが出る！</button>
+    <p class="fine">出る人が自分で押してね。${played ? 'あなたは出場済みなので、まだ出ていない人を優先してね。' : ''}</p>`;
+}
+
 function mountLobby() {
-  app.innerHTML = `<div id="lobbyMain"></div><div id="lobbyScore"></div>
+  app.innerHTML = `<div id="lobbyMain"></div><div id="lobbyPick"></div><div id="lobbyScore"></div>
     <section class="card"><div class="card-head"><h2>👥 参加メンバー</h2><span class="chip" id="memberCount"></span></div><div id="lobbyRoster"></div></section>`;
+  let busy = false;
   const paint = () => {
     const st = S.state;
     const g = L.GAMES[st.game] || L.GAMES[L.ROUND_GAMES[(st.round || 1) - 1]];
     const m = me();
-    const played = S.used?.[uid];
+    const team = m.team;
+    const played = !!S.used?.[uid];
     const hasResults = Object.keys(S.results || {}).length > 0;
+    const pick = S.pick || {};
+    const mates = Object.entries(S.members || {}).filter(([, x]) => x.team === team).map(([u, x]) => ({ uid: u, ...x }));
+    const unusedMates = mates.filter(x => !S.used?.[x.uid]);
+    const myPick = pick[team] && S.members?.[pick[team]]?.team === team ? pick[team] : null;
     $('#lobbyMain').innerHTML = `
-      <section class="card hero" style="${tvars(m.team)}">
-        <div class="eyebrow">${hasResults ? `NEXT ・ GAME ${st.round} / 4` : 'WELCOME'}</div>
-        <h2 class="title-lg">${hasResults ? `${g.icon} ${esc(g.title)}` : `ようこそ、${esc(m.name)}さん！`}</h2>
-        <p>${hasResults ? '司会者が代表者を選んでいます…' : `あなたは <b class="tcolor">${m.team}チーム</b>。開幕までもう少し待ってね。`}</p>
+      <section class="card hero" style="${tvars(team)}">
+        <div class="eyebrow">${hasResults ? 'NEXT' : 'WELCOME'} ・ GAME ${st.round} / 4</div>
+        <h2 class="title-lg">${g.icon} ${esc(g.title)}${Number(st.mult) > 1 ? ' <span class="x2">×2</span>' : ''}</h2>
+        <p>${hasResults ? '' : `ようこそ、${esc(m.name)}さん！ あなたは <b class="tcolor">${team}チーム</b>。<br>`}チームで相談して、このゲームの代表者を決めよう！</p>
         <div class="wait-dots"><i></i><i></i><i></i></div>
-        <p class="fine">${played ? '✅ あなたは出場済み。あとは全力で応援！' : '代表者に選ばれたら、この画面が自動でゲーム画面に切り替わるよ。'}</p>
       </section>`;
-    $('#lobbyScore').innerHTML = hasResults ? scoreboardHTML(S.results, S.adjust, { me: m.team }) : '';
+    $('#lobbyPick').innerHTML = `
+      <section class="card pick-card" style="${tvars(team)}">
+        <div class="card-head"><h2>✋ ${team}チームの代表者</h2><span class="chip ${myPick ? 'ok' : 'warn'}">${myPick ? '決定' : '未定'}</span></div>
+        <div class="pick-now">${myPick ? `<b class="tcolor">${esc(S.members[myPick].name)}</b> さんに決定！` : '<span class="muted">まだ決まっていません</span>'}</div>
+        ${pickButtonsHTML(myPick, played, busy)}
+        <ul class="pick-members">${mates.map(x => `<li class="${x.uid === myPick ? 'picked' : ''} ${x.uid === uid ? 'me' : ''}">${x.uid === myPick ? '✋ ' : ''}${esc(x.name)}${S.used?.[x.uid] ? ` <small class="played">${Object.keys(S.used[x.uid]).map(k => k.replace('r', 'G')).join('・')}出場</small>` : ' <small class="fresh">未出場</small>'}</li>`).join('')}</ul>
+      </section>
+      <section class="card"><div class="card-head"><h2>📋 各チームの代表者</h2><span class="chip">${L.TEAMS.filter(t => pick[t]).length}/5 決定</span></div>
+        <ul class="reps">${L.TEAMS.map(t => { const u = pick[t]; const nm = u && S.members?.[u]?.team === t ? S.members[u].name : null; return `<li class="rep ${t === team ? 'me' : ''}" style="${tvars(t)}">${teamBadge(t)}<b>${nm ? esc(nm) : '<span class="muted">未定</span>'}</b><span class="rep-st">${nm ? '<span class="ok">決定</span>' : '<span class="muted">相談中…</span>'}</span></li>`; }).join('')}</ul>
+      </section>`;
+    $('#pickBtn')?.addEventListener('click', async () => {
+      if (played && unusedMates.length && !confirm(`あなたは出場済みです。まだ出ていない人（${unusedMates.map(x => x.name).join('・')}）がいますが、それでも出ますか？`)) return;
+      busy = true; paint();
+      try { await be.set(`pick/${team}`, uid); sfx.choose(); vibrate(40); wantAwake(); }
+      catch (e) { toast(errMsg(e), 'error', 5000); }
+      busy = false; paint();
+    });
+    $('#unpickBtn')?.addEventListener('click', async () => {
+      busy = true; paint();
+      try { await be.remove(`pick/${team}`); } catch (e) { toast(errMsg(e), 'error', 5000); }
+      busy = false; paint();
+    });
+    $('#lobbyScore').innerHTML = hasResults ? scoreboardHTML(S.results, S.adjust, { me: team }) : '';
     $('#lobbyRoster').innerHTML = rosterHTML(S.members, { me: uid, used: S.used });
     $('#memberCount').textContent = `${Object.keys(S.members || {}).length}人`;
   };
