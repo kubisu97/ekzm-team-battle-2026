@@ -1,0 +1,125 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "state": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "config": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "results": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "adjust": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "used": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "quizBank": {
+      ".read": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "adminOnly": {
+      ".read": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'"
+    },
+    "members": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('config/regOpen').val() === true",
+        ".validate": "newData.hasChildren(['name','team','slot','at'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 16"
+        },
+        "team": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-E]$/)"
+        },
+        "slot": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]$/) && newData.parent().parent().parent().child('slots').child(newData.parent().child('team').val()).child(newData.val()).val() === $uid"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "slots": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$team": {
+        "$n": {
+          ".write": "auth != null && newData.val() === auth.uid && !data.exists() && root.child('config/regOpen').val() === true && root.child('config/slots').child($n).val() === true && $team.matches(/^[A-E]$/)",
+          ".validate": "newData.isString() && newData.parent().parent().parent().child('members').child(newData.val()).child('team').val() === $team && newData.parent().parent().parent().child('members').child(newData.val()).child('slot').val() === $n"
+        }
+      }
+    },
+    "online": {
+      ".read": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isNumber()"
+      }
+    },
+    "subs": {
+      ".read": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$run": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$k": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('state/runId').val() === $run && root.child('state/phase').val() === 'running' && root.child('state/repOf').child($uid).exists() && (($k === 'res' && root.child('state/game').val() !== 'quiz') || ($k.matches(/^q[0-4]$/) && root.child('state/game').val() === 'quiz' && root.child('state/quiz/key').val() === $k && root.child('state/quiz/open').val() === true))",
+            ".validate": "newData.hasChildren(['v','at']) && newData.child('at').val() === now && (root.child('state/game').val() !== 'tap' || newData.child('v').val() <= 250)",
+            "v": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 120000"
+            },
+            "f": {
+              ".validate": "newData.isBoolean()"
+            },
+            "c": {
+              ".validate": "newData.isNumber() && newData.val() >= -1 && newData.val() <= 3"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "prog": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$run": {
+        "$uid": {
+          "$k": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('state/runId').val() === $run && root.child('state/repOf').child($uid).exists() && (root.child('state/phase').val() === 'running' || ($k === 'ok' && root.child('state/phase').val() === 'ready'))",
+            ".validate": "newData.val() === true && $k.matches(/^(ok|go|res|g[0-4]|q[0-4])$/)"
+          }
+        }
+      }
+    },
+    "live": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$run": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && root.child('state/runId').val() === $run && root.child('state/phase').val() === 'running' && root.child('state/game').val() === 'tap' && root.child('state/repOf').child($uid).exists()",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 250 && (!data.exists() || newData.val() >= data.val())"
+        }
+      }
+    }
+  }
+}

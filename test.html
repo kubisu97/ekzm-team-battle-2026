@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>EKZM TEAM BATTLE 2026 テストツール</title>
+<link rel="stylesheet" href="style.css?v=1">
+<style>.logline{font:12px/1.5 ui-monospace,monospace;border-bottom:1px solid var(--line);padding:2px 0}.logline.ok{color:var(--ok)}.logline.ng{color:var(--ng)}#log{max-height:260px;overflow:auto}</style>
+</head>
+<body class="admin">
+<header class="topbar"><div class="logo"><b>EKZM</b><span>TEST TOOLS（リハーサル専用）</span></div></header>
+<main class="wrap">
+  <section class="card"><h2>🧪 通しテスト用ツール</h2>
+    <p id="gate" class="note">確認中…</p>
+    <p class="fine">疑似参加者（ボット）を作り、管理画面から4ゲームを進行して動作を確かめるためのページです。本番前に管理画面の「全データ初期化」でボットを消してください。</p>
+  </section>
+  <section class="card"><div class="card-head"><h2>🤖 ボット</h2><span class="row"><input id="botN" class="input input-sm" type="number" min="1" max="25" value="20"> 体
+    <button class="btn btn-primary btn-sm" id="startBtn" data-need-admin disabled>起動</button><button class="btn btn-sm" id="stopBtn">自動プレイ停止</button></span></div>
+    <div id="bots"></div></section>
+  <section class="card"><div class="card-head"><h2>🔐 セキュリティ検査</h2><span class="row"><button class="btn btn-sm" id="secBtn" data-need-admin disabled>検査を実行</button><button class="btn btn-sm" id="dupBtn" data-need-admin disabled>二重送信テスト</button></span></div>
+    <table class="tbl"><thead><tr><th></th><th>操作</th><th>期待</th><th>結果</th></tr></thead><tbody id="secRows"></tbody></table></section>
+  <section class="card"><h2>📜 ログ</h2><div id="log"></div></section>
+</main>
+<script type="module" src="js/bots.js?v=1"></script>
+</body>
+</html>
