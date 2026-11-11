@@ -30,19 +30,23 @@ export function perfAt(be, serverT) {
 /** 指定時刻まで rAF で待ち、ちょうど描画するフレームで onGo(now) を呼ぶ */
 export function waitUntil(perfTarget, { onTick, onGo }) {
   let raf = 0;
+  let to = 0;
   let last = null;
   let dead = false;
   const loop = () => {
+    cancelAnimationFrame(raf); clearTimeout(to);
     if (dead) return;
     const now = performance.now();
     const remain = perfTarget - now;
-    if (remain <= 0) { onGo?.(now); return; }
+    if (remain <= 0) { dead = true; onGo?.(now); return; }
     const n = Math.ceil(remain / 1000);
     if (n !== last) { last = n; onTick?.(n, remain); }
-    raf = requestAnimationFrame(loop);
+    schedule();
   };
-  raf = requestAnimationFrame(loop);
-  return () => { dead = true; cancelAnimationFrame(raf); };
+  // 通常は rAF（描画フレームに合わせる）。rAF が止まる環境ではタイマーで代替
+  const schedule = () => { raf = requestAnimationFrame(loop); to = setTimeout(loop, 60); };
+  schedule();
+  return () => { dead = true; cancelAnimationFrame(raf); clearTimeout(to); };
 }
 
 /** カウントダウン表示（3,2,1,START!）。COUNTDOWN 中の大きな数字。 */

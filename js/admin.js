@@ -131,7 +131,10 @@ function defaultConfig(cap) {
 function queueRender() {
   if (renderQueued) return;
   renderQueued = true;
-  requestAnimationFrame(() => { renderQueued = false; render(); });
+  // 画面が非表示だと requestAnimationFrame が止まるため、タイマーでも必ず描画する
+  const run = () => { if (!renderQueued) return; renderQueued = false; render(); };
+  requestAnimationFrame(run);
+  setTimeout(run, 120);
 }
 
 // ---------- 描画 ----------

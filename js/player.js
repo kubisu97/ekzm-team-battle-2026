@@ -82,7 +82,10 @@ function syncRunWatch() {
 function queueRender() {
   if (renderQueued) return;
   renderQueued = true;
-  requestAnimationFrame(() => { renderQueued = false; render(); });
+  // 画面が非表示だと requestAnimationFrame が止まるため、タイマーでも必ず描画する
+  const run = () => { if (!renderQueued) return; renderQueued = false; render(); };
+  requestAnimationFrame(run);
+  setTimeout(run, 120);
 }
 
 // ---------- ヘッダー ----------
@@ -451,7 +454,7 @@ function tapRep(st) {
       <p class="hint" id="tapHint">合図と同時に連打！</p>
     </section>`;
   const pad = $('#tapPad'), cnt = $('#tapCount'), time = $('#tapTime'), bar = $('#tapBar'), hint = $('#tapHint');
-  let t0 = null, n = 0, ended = false, raf = 0, liveTimer = 0, lastSent = -1;
+  let t0 = null, n = 0, ended = false, raf = 0, liveTimer = 0, lastSent = -1, endTimer = 0;
   const cancelCd = countdownOverlay(app, goTime(st), {
     label: '7秒連打',
     onGo(now) {
@@ -471,6 +474,7 @@ function tapRep(st) {
         raf = requestAnimationFrame(loop);
       };
       raf = requestAnimationFrame(loop);
+      endTimer = setTimeout(end, L.TAP_MS + 80); // 画面描画が止まっても7秒で必ず締める
     },
   });
   pad.addEventListener('pointerdown', e => {
@@ -487,14 +491,14 @@ function tapRep(st) {
   function end() {
     if (ended) return;
     ended = true;
-    clearInterval(liveTimer); cancelAnimationFrame(raf);
+    clearInterval(liveTimer); cancelAnimationFrame(raf); clearTimeout(endTimer);
     pad.disabled = true; pad.classList.remove('live');
     pad.innerHTML = '<span>TIME UP!</span>';
     sfx.stop(); vibrate([60, 40, 60]);
     finishSend(st, 'res', { v: n }, hint, `記録 ${n}回 を送信しました！結果発表を待とう`, guard);
   }
   const guard = { sent: false };
-  return { update: () => retryCheck(guard), destroy() { cancelCd(); clearInterval(liveTimer); cancelAnimationFrame(raf); document.body.classList.remove('fullgame'); } };
+  return { update: () => retryCheck(guard), destroy() { cancelCd(); clearInterval(liveTimer); clearTimeout(endTimer); cancelAnimationFrame(raf); document.body.classList.remove('fullgame'); } };
 }
 
 function quizRep(st) {
