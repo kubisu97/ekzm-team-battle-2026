@@ -63,6 +63,14 @@
         }
       }
     },
+    "pick": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
+      "$team": {
+        ".write": "auth != null && root.child('state/phase').val() === 'lobby' && root.child('members').child(auth.uid).child('team').val() === $team && (newData.val() === auth.uid || (!newData.exists() && data.val() === auth.uid))",
+        ".validate": "newData.isString() && $team.matches(/^[A-E]$/) && root.child('members').child(newData.val()).child('team').val() === $team"
+      }
+    },
     "online": {
       ".read": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
       ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
