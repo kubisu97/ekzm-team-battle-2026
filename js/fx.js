@@ -116,7 +116,7 @@ export function flash(color = '#fff', ms = 260) {
   setTimeout(() => el.remove(), ms + 50);
 }
 
-export function confetti(duration = 3500, colors = ['#ff4d6d', '#ffc531', '#2ee6a6', '#47a3ff', '#b97cff', '#ffffff']) {
+export function confetti(duration = 3500, colors = ['#d9483b', '#e9b21c', '#1f9a55', '#2d63b0', '#8a5bb0', '#112850']) {
   const cv = document.createElement('canvas');
   cv.className = 'fx-confetti';
   document.body.appendChild(cv);

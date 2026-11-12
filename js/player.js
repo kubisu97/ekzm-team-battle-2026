@@ -1,12 +1,13 @@
 // 参加者・観戦画面
-import { createBackend, errMsg } from './db.js';
-import * as L from './logic.js';
-import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js';
-import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js';
+import { createBackend, errMsg } from './db.js?v=3';
+import * as L from './logic.js?v=3';
+import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=3';
+import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js?v=3';
 import {
   $, esc, tvars, teamBadge, toast, perfAt, waitUntil, countdownOverlay,
   scoreboardHTML, mountRoundReveal, mountFinalReveal, rosterHTML,
-} from './ui.js';
+  head, gameTag, cubeSVG, ICON, howtoHTML, pointsHTML, openHelp,
+} from './ui.js?v=3';
 
 const params = new URLSearchParams(location.search);
 const slotParam = (params.get('p') || '').replace(/[^\w-]/g, '').slice(0, 12);
@@ -92,9 +93,10 @@ function queueRender() {
 function setupHeader() {
   window.addEventListener('pointerdown', () => { if (me()) wantAwake(); }, { passive: true });
   const btn = $('#soundBtn');
-  const paint = () => { btn.textContent = isMuted() ? '🔇' : '🔊'; btn.setAttribute('aria-label', isMuted() ? '音を出す' : '消音'); };
+  const paint = () => { btn.innerHTML = isMuted() ? ICON.soundOff : ICON.soundOn; btn.setAttribute('aria-label', isMuted() ? '音を出す' : '消音する'); };
   paint();
   btn.addEventListener('click', () => { setMuted(!isMuted()); paint(); if (!isMuted()) sfx.choose(); });
+  $('#helpBtn')?.addEventListener('click', openHelp);
 }
 
 function paintMe() {
@@ -150,25 +152,32 @@ function mount(key) {
 
 function simple(html) { app.innerHTML = html; return {}; }
 const loadingHTML = msg => `<section class="card center loading"><div class="spinner"></div><p>${esc(msg)}</p></section>`;
-const fatalHTML = msg => `<section class="card center warn"><h2>⚠️ エラー</h2><p>${msg}</p><button class="btn" onclick="location.reload()">再読み込み</button></section>`;
-const waitingInitHTML = () => `<section class="card center"><div class="big-emoji">🎮</div><h2>準備中</h2><p>司会者がゲームを準備しています。少し待ってから再読み込みしてね。</p></section>`;
+const fatalHTML = msg => `<section class="card center warn"><span class="label">Error</span><h2>うまく読み込めませんでした</h2><p>${msg}</p><button class="btn" onclick="location.reload()">再読み込み <span class="arr">→</span></button></section>`;
+const waitingInitHTML = () => `<section class="card center">${cubeSVG()}<span class="label">Preparing</span><h2>準備中です</h2><p>司会者がゲームを準備しています。少し待ってから、このページを再読み込みしてください。</p></section>`;
 
 // ---------- 参加登録 ----------
 function mountJoin() {
   let picked = null;
   let busy = false;
   app.innerHTML = `
-    <section class="card hero-join">
-      <div class="eyebrow">YEAR END PARTY 2026</div>
-      <h2 class="title-xl">ENTRY</h2>
-      <p class="muted">名前を入れて、自分のチームを選んでね。</p>
+    <section class="card white hero-join">
+      ${cubeSVG(130)}
+      <div class="eyebrow">2026.12.18 Year-end party</div>
+      <h2 class="title-xl">チーム対抗<br>ゲーム大会</h2>
+      <p class="muted">5チームに分かれて4つのゲームで対決します。<br>まずは名前を入れて、自分のチームを選んでください。</p>
       <label class="lbl" for="nameIn">名前（ニックネームOK・16文字まで）</label>
       <input id="nameIn" class="input" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="例：くりす">
       <label class="lbl">チーム</label>
       <div class="team-pick" id="teamPick"></div>
       <div id="regMsg"></div>
-      <button class="btn btn-primary btn-xl" id="joinBtn" disabled>参加する ▶</button>
-      <p class="fine">※ 同じスマホ・同じブラウザなら、再読み込みしても参加情報は消えません。別のアプリやブラウザで開き直すと別人扱いになるので注意。</p>
+      <button class="btn btn-primary btn-xl" id="joinBtn" disabled>参加する <span class="arr">→</span></button>
+      <p class="fine">同じスマホ・同じブラウザなら、再読み込みしても参加情報は消えません。別のアプリやブラウザで開き直すと別人扱いになるので注意してください。</p>
+    </section>
+    <section class="card">
+      ${head('How to play', '参加のながれ')}
+      <ol class="howto">${L.OVERVIEW.flow.map(h => `<li>${h}</li>`).join('')}</ol>
+      <div class="infobox"><span class="k">得点</span>各ゲームの順位で得点が入り、4ゲームの合計で総合優勝が決まります（最終ゲームは2倍）。${pointsHTML(1)}</div>
+      <p class="fine">ゲームのくわしいルールは、各ゲームの前に画面に出ます。右上の「?」ボタンでいつでも見られます。</p>
     </section>`;
   const nameIn = $('#nameIn');
   const btn = $('#joinBtn');
@@ -204,7 +213,7 @@ function mountJoin() {
       vibrate(40);
     } catch (e) {
       toast(errMsg(e), 'error', 5000);
-      busy = false; btn.textContent = '参加する ▶'; paint();
+      busy = false; btn.innerHTML = '参加する <span class="arr">→</span>'; paint();
     }
   });
   paint();
@@ -215,20 +224,22 @@ function mountJoin() {
 function pickButtonsHTML(myPick, played, busy) {
   const dis = busy ? 'disabled' : '';
   if (myPick === uid) {
-    return `<p class="center">🔥 あなたが代表！ 司会者の発表を待とう。</p><button class="btn btn-ghost" id="unpickBtn" ${dis}>辞退する</button>`;
+    return `<p class="center"><b>あなたが代表です。</b>司会者の発表を待ちましょう。</p><button class="btn btn-ghost" id="unpickBtn" ${dis}>辞退する</button>`;
   }
-  if (myPick) return `<button class="btn btn-ghost" id="pickBtn" ${dis}>✋ 代わりにわたしが出る</button>`;
-  return `<button class="btn btn-primary btn-xl" id="pickBtn" ${dis}>✋ わたしが出る！</button>
-    <p class="fine">出る人が自分で押してね。${played ? 'あなたは出場済みなので、まだ出ていない人を優先してね。' : ''}</p>`;
+  if (myPick) return `<button class="btn btn-ghost" id="pickBtn" ${dis}>代わりにわたしが出る</button>`;
+  return `<button class="btn btn-primary btn-xl" id="pickBtn" ${dis}>わたしが出る <span class="arr">→</span></button>
+    ${played ? '<p class="fine">あなたは出場済みです。まだ出ていない人を優先してください。</p>' : ''}`;
 }
 
 function mountLobby() {
-  app.innerHTML = `<div id="lobbyMain"></div><div id="lobbyPick"></div><div id="lobbyScore"></div>
-    <section class="card"><div class="card-head"><h2>👥 参加メンバー</h2><span class="chip" id="memberCount"></span></div><div id="lobbyRoster"></div></section>`;
+  app.innerHTML = `<div id="lobbyMain"></div><div id="lobbyPick"></div><div id="lobbyHow"></div><div id="lobbyReps"></div><div id="lobbyScore"></div>
+    <section class="card">${head('Members', '参加メンバー', '<span class="chip" id="memberCount"></span>')}<div id="lobbyRoster"></div></section>`;
   let busy = false;
+  let howKey = '';
   const paint = () => {
     const st = S.state;
-    const g = L.GAMES[st.game] || L.GAMES[L.ROUND_GAMES[(st.round || 1) - 1]];
+    const gk = st.game || L.ROUND_GAMES[(st.round || 1) - 1];
+    const g = L.GAMES[gk];
     const m = me();
     const team = m.team;
     const played = !!S.used?.[uid];
@@ -237,22 +248,32 @@ function mountLobby() {
     const mates = Object.entries(S.members || {}).filter(([, x]) => x.team === team).map(([u, x]) => ({ uid: u, ...x }));
     const unusedMates = mates.filter(x => !S.used?.[x.uid]);
     const myPick = pick[team] && S.members?.[pick[team]]?.team === team ? pick[team] : null;
+    const decided = L.TEAMS.filter(t => pick[t] && S.members?.[pick[t]]?.team === t).length;
     $('#lobbyMain').innerHTML = `
-      <section class="card hero" style="${tvars(team)}">
-        <div class="eyebrow">${hasResults ? 'NEXT' : 'WELCOME'} ・ GAME ${st.round} / 4</div>
-        <h2 class="title-lg">${g.icon} ${esc(g.title)}${Number(st.mult) > 1 ? ' <span class="x2">×2</span>' : ''}</h2>
-        <p>${hasResults ? '' : `ようこそ、${esc(m.name)}さん！ あなたは <b class="tcolor">${team}チーム</b>。<br>`}チームで相談して、このゲームの代表者を決めよう！</p>
+      <section class="card hero">
+        <span class="label">${hasResults ? 'Next Game' : 'Welcome'}</span>
+        ${hasResults ? '' : `<p style="margin:4px 0 0">ようこそ、<b>${esc(m.name)}</b> さん。あなたは ${teamBadge(team)} <b class="tcolor">${team}チーム</b> です。</p>`}
+        <h2 class="title-lg">${gameTag(gk)}<br>${esc(g.title)}${Number(st.mult) > 1 ? '<span class="x2">得点2倍</span>' : ''}</h2>
+        <p class="muted">${esc(g.lead)}。<br>まずはチームで、このゲームに出る代表者を1人決めましょう。</p>
         <div class="wait-dots"><i></i><i></i><i></i></div>
       </section>`;
     $('#lobbyPick').innerHTML = `
       <section class="card pick-card" style="${tvars(team)}">
-        <div class="card-head"><h2>✋ ${team}チームの代表者</h2><span class="chip ${myPick ? 'ok' : 'warn'}">${myPick ? '決定' : '未定'}</span></div>
-        <div class="pick-now">${myPick ? `<b class="tcolor">${esc(S.members[myPick].name)}</b> さんに決定！` : '<span class="muted">まだ決まっていません</span>'}</div>
+        ${head('Representative', `${team}チームの代表者`, `<span class="chip ${myPick ? 'ok' : 'warn'}">${myPick ? '決定' : '未定'}</span>`)}
+        <div class="pick-now">${myPick ? `<b>${esc(S.members[myPick].name)}</b> さんに決定` : '<span class="muted">まだ決まっていません</span>'}</div>
         ${pickButtonsHTML(myPick, played, busy)}
-        <ul class="pick-members">${mates.map(x => `<li class="${x.uid === myPick ? 'picked' : ''} ${x.uid === uid ? 'me' : ''}">${x.uid === myPick ? '✋ ' : ''}${esc(x.name)}${S.used?.[x.uid] ? ` <small class="played">${Object.keys(S.used[x.uid]).map(k => k.replace('r', 'G')).join('・')}出場</small>` : ' <small class="fresh">未出場</small>'}</li>`).join('')}</ul>
-      </section>
-      <section class="card"><div class="card-head"><h2>📋 各チームの代表者</h2><span class="chip">${L.TEAMS.filter(t => pick[t]).length}/5 決定</span></div>
+        <ul class="pick-members">${mates.map(x => `<li class="${x.uid === myPick ? 'picked' : ''} ${x.uid === uid ? 'me' : ''}">${esc(x.name)}${S.used?.[x.uid] ? ` <small class="played">${Object.keys(S.used[x.uid]).map(k => k.replace('r', 'G')).join('・')}出場</small>` : ' <small class="fresh">未出場</small>'}</li>`).join('')}</ul>
+        <div class="infobox"><span class="k">代表者の決め方</span>
+          チームで話し合って、出る人が<b>自分のスマホ</b>で「わたしが出る」を押してください。決まるとチーム全員の画面に名前が出ます。
+          取り消すときは本人が「辞退する」、交代するときは新しく出る人が「代わりにわたしが出る」を押します。4ゲームで全員が1回ずつ出るのが目安です。</div>
+      </section>`;
+    if (howKey !== gk + st.mult) {
+      howKey = gk + st.mult;
+      $('#lobbyHow').innerHTML = `<section class="card">${head('How to play', `「${esc(g.title)}」の遊び方`)}${howtoHTML(gk, { mult: st.mult })}</section>`;
+    }
+    $('#lobbyReps').innerHTML = `<section class="card">${head('Status', '各チームの代表者', `<span class="chip">${decided}/5 決定</span>`)}
         <ul class="reps">${L.TEAMS.map(t => { const u = pick[t]; const nm = u && S.members?.[u]?.team === t ? S.members[u].name : null; return `<li class="rep ${t === team ? 'me' : ''}" style="${tvars(t)}">${teamBadge(t)}<b>${nm ? esc(nm) : '<span class="muted">未定</span>'}</b><span class="rep-st">${nm ? '<span class="ok">決定</span>' : '<span class="muted">相談中…</span>'}</span></li>`; }).join('')}</ul>
+        <p class="fine">全チームの代表者がそろったら、司会者が発表してゲームが始まります。</p>
       </section>`;
     $('#pickBtn')?.addEventListener('click', async () => {
       if (played && unusedMates.length && !confirm(`あなたは出場済みです。まだ出ていない人（${unusedMates.map(x => x.name).join('・')}）がいますが、それでも出ますか？`)) return;
@@ -285,32 +306,41 @@ function repsListHTML(st, statusFn) {
 
 function gameIntroHTML(st) {
   const g = L.GAMES[st.game];
-  return `<section class="card game-intro g-${st.game}">
-    <div class="eyebrow">GAME ${gameNo(st)} / 4 ${Number(st.mult) > 1 ? '<span class="x2">得点 ×2</span>' : ''}</div>
-    <h2 class="title-lg">${g.icon} ${esc(g.title)}</h2>
-    <div class="en">${g.en}</div>
-    <p>${esc(g.rule)}</p>
+  return `<section class="card game-intro">
+    <span class="label">Game ${gameNo(st)} / 4</span>
+    <h2 class="title-lg">${gameTag(st.game)}<br>${esc(g.title)}${Number(st.mult) > 1 ? '<span class="x2">得点2倍</span>' : ''}</h2>
+    <p class="muted" style="margin:0">${esc(g.lead)}</p>
   </section>`;
 }
 
 function mountReady() {
   const st = S.state;
   const rep = isRep();
+  const g = L.GAMES[st.game];
   app.innerHTML = `${gameIntroHTML(st)}
     <div id="youBox"></div>
-    <section class="card"><div class="card-head"><h2>🎤 代表者</h2></div><div id="repsBox"></div></section>`;
-  if (rep) { sfx.fanfare(); vibrate([100, 60, 100]); flash(L.TEAM_INFO[me().team].glow, 400); } else sfx.reveal();
+    <section class="card">${head('How to play', '遊び方')}${howtoHTML(st.game, { mult: st.mult, role: rep ? 'rep' : 'all' })}</section>
+    <section class="card">${head('Players', '今回の代表者')}<div id="repsBox"></div></section>`;
+  if (rep) { sfx.fanfare(); vibrate([100, 60, 100]); } else sfx.reveal();
   let sending = false;
   const paint = () => {
     const okMine = !!S.prog?.[uid]?.ok;
     $('#youBox').innerHTML = rep
       ? `<section class="card you-rep" style="${tvars(me().team)}">
-          <div class="big-emoji">🔥</div>
-          <h2>あなたが <b class="tcolor">${me().team}チーム</b> の代表！</h2>
-          <p>前に出てスマホを構えよう。ゲームは司会者の合図で一斉スタート。</p>
-          <button class="btn btn-primary btn-xl" id="okBtn" ${okMine || sending ? 'disabled' : ''}>${okMine ? '✅ 準備OK！スタートを待とう' : '準備OK！'}</button>
+          <span class="label">Your turn</span>
+          <h2>あなたが ${teamBadge(me().team)} <b class="tcolor">${me().team}チーム</b> の代表です</h2>
+          <ul class="checklist">
+            <li>スマホを縦にして、しっかり持つ</li>
+            <li>マナーモードを解除して、音が出るようにする</li>
+            <li>司会者の近くに出て、合図を待つ</li>
+            <li>ゲームが始まったら、画面を閉じたり再読み込みしたりしない</li>
+          </ul>
+          <button class="btn btn-primary btn-xl" id="okBtn" ${okMine || sending ? 'disabled' : ''}>${okMine ? '準備OK。スタートを待っています' : '準備OK <span class="arr">→</span>'}</button>
+          <p class="fine">「準備OK」を押すと司会者の画面に表示されます。スタートは司会者の合図で、全員同時です。</p>
         </section>`
-      : `<section class="card spectator-note"><div class="big-emoji">📣</div><h2>今回は観戦！</h2><p>このまま待てば、試合のようすがリアルタイムで見られるよ。代表を応援しよう！</p></section>`;
+      : `<section class="card spectator-note"><span class="label">Watching</span><h2>今回は観戦です</h2>
+          <p>このまま画面を開いておくと、ゲームのようすがリアルタイムで見られます。代表者を応援しましょう。</p>
+          <div class="infobox" style="text-align:left"><span class="k">観戦画面で見られること</span>${esc(g.spec)}</div></section>`;
     $('#repsBox').innerHTML = repsListHTML(st, u => (S.prog?.[u]?.ok ? '<span class="ok">準備OK</span>' : '<span class="muted">準備中…</span>'));
     $('#okBtn')?.addEventListener('click', async () => {
       sending = true; paint();
@@ -329,7 +359,7 @@ function mountRep() {
   const st = S.state;
   const done = st.game === 'quiz' ? false : !!S.mine?.res;
   const started = !!S.prog?.[uid]?.go;
-  if (done) return submittedView('記録済み！', '結果発表をお楽しみに。');
+  if (done) return submittedView('記録しました', '結果は全チームそろってから、みんなの画面で同時に発表されます。席に戻って待ちましょう。');
   if (st.game !== 'quiz' && started) return lockedView('go');
   if (st.game === 'ten') return tenRep(st);
   if (st.game === 'iai') return iaiRep(st);
@@ -339,14 +369,14 @@ function mountRep() {
 }
 
 function submittedView(title, sub) {
-  app.innerHTML = `<section class="card center submitted"><div class="big-emoji">✅</div><h2>${esc(title)}</h2><p>${esc(sub)}</p></section>`;
+  app.innerHTML = `<section class="card center submitted">${cubeSVG()}<span class="label">Recorded</span><h2>${esc(title)}</h2><p>${esc(sub)}</p></section>`;
   return { update: () => (!S.mine?.res ? 'remount' : undefined) }; // 司会者が再挑戦を許可したら戻る
 }
 
 function lockedView(flag) {
-  app.innerHTML = `<section class="card center warn"><div class="big-emoji">⏸️</div><h2>挑戦が中断されました</h2>
+  app.innerHTML = `<section class="card center warn"><span class="label">Paused</span><h2>挑戦が中断されました</h2>
     <p>ゲームの途中で画面が再読み込みされた（または閉じられた）ため、この挑戦はいったん止まっています。</p>
-    <p><b>司会者に「再挑戦を許可」してもらうと、もう一度プレイできます。</b></p></section>`;
+    <div class="infobox"><span class="k">どうすればいい？</span>司会者に声をかけて、管理画面の「再挑戦を許可」を押してもらってください。この画面が自動でゲームに戻ります。</div></section>`;
   return { update: () => (!S.prog?.[uid]?.[flag] ? 'remount' : undefined) };
 }
 
@@ -371,15 +401,15 @@ function finishSend(st, key, payload, hintEl, okMsg = '記録しました！結�
 
 function tenRep(st) {
   app.innerHTML = `<section class="game game-ten">
-      <div class="game-top"><span class="eyebrow">GAME ${gameNo(st)} ・ 代表者</span><h2>⏱️ 10秒ぴったり</h2></div>
+      <div class="game-top"><span class="label">Game ${gameNo(st)} ・ 代表者</span><h2>10秒ぴったり</h2></div>
       <div class="ten-display"><span class="ten-num" id="tenNum">0.00</span><span class="ten-unit">秒</span></div>
-      <p class="hint" id="tenHint">スタートしたら心の中でカウント！</p>
+      <p class="hint big" id="tenHint">スタートしたら心の中で数えて、10秒ちょうどでSTOP</p>
       <button class="stop-btn" id="stopBtn" disabled>STOP</button>
     </section>`;
   const num = $('#tenNum'), hint = $('#tenHint'), btn = $('#stopBtn');
   let t0 = null, stopped = false, raf = 0;
   const cancelCd = countdownOverlay(app, goTime(st), {
-    label: '10秒ぴったり',
+    label: '10秒ぴったり', sub: '数字が見えるのは最初の3秒だけ。10秒だと思ったらSTOPをタップ',
     onGo(now) {
       t0 = now; sfx.go(); vibrate(40); markProg(be, st.runId, 'go');
       btn.disabled = false; btn.classList.add('live');
@@ -387,7 +417,7 @@ function tenRep(st) {
         if (stopped) return;
         const e = performance.now() - t0;
         if (e < L.TEN_VISIBLE) num.textContent = (e / 1000).toFixed(2);
-        else if (!num.classList.contains('masked')) { num.textContent = '?.??'; num.classList.add('masked'); hint.textContent = 'ここからは体内時計だけが頼り！'; }
+        else if (!num.classList.contains('masked')) { num.textContent = '?.??'; num.classList.add('masked'); hint.textContent = '数字は隠れました。数え続けて、10秒ちょうどでSTOP'; }
         if (e >= L.TEN_LIMIT) { finish(L.TEN_LIMIT); return; }
         raf = requestAnimationFrame(loop);
       };
@@ -414,7 +444,7 @@ function iaiRep(st) {
       <div class="iai-bg"></div><div class="iai-moon"></div><div class="iai-ground"></div>
       <div class="iai-label"><span class="eyebrow">GAME ${gameNo(st)} ・ 居合斬り</span></div>
       <div class="iai-text" id="iaiText">　</div>
-      <div class="iai-sub" id="iaiSub">「斬れ！」が出た瞬間、画面のどこかをタップ</div>
+      <div class="iai-sub" id="iaiSub">「構え…」の間は触らずに待つ。「斬れ！」が出た瞬間に画面のどこかをタップ</div>
       <div class="slash-layer" id="slashLayer"></div>
     </section>`;
   const area = $('#iaiArea'), text = $('#iaiText'), sub = $('#iaiSub');
@@ -422,7 +452,7 @@ function iaiRep(st) {
   const kamaeAt = goTime(st);
   const delay = Number(st.iaiDelay) || 3000;
   const cancelCd = countdownOverlay(app, kamaeAt, {
-    label: '居合斬り',
+    label: '居合斬り', sub: '「構え…」の間に触るとフライングで失格。「斬れ！」でタップ',
     onGo() {
       armed = true; markProg(be, st.runId, 'go');
       text.textContent = '構え…'; text.className = 'iai-text kamae';
@@ -488,12 +518,12 @@ function tapRep(st) {
       <div class="tap-bar"><i id="tapBar"></i></div>
       <div class="tap-count" id="tapCount">0</div>
       <button class="tap-pad" id="tapPad" disabled><span>TAP!</span></button>
-      <p class="hint" id="tapHint">合図と同時に連打！</p>
+      <p class="hint" id="tapHint">スタートの合図で、黄色いボタンを7秒間とにかく連打</p>
     </section>`;
   const pad = $('#tapPad'), cnt = $('#tapCount'), time = $('#tapTime'), bar = $('#tapBar'), hint = $('#tapHint');
   let t0 = null, n = 0, ended = false, raf = 0, liveTimer = 0, lastSent = -1, endTimer = 0;
   const cancelCd = countdownOverlay(app, goTime(st), {
-    label: '7秒連打',
+    label: '7秒連打', sub: 'スタートしたら黄色いボタンを連打。指を何本使ってもOK',
     onGo(now) {
       t0 = now; sfx.go(); vibrate(40); markProg(be, st.runId, 'go');
       pad.disabled = false; pad.classList.add('live');
@@ -540,14 +570,14 @@ function tapRep(st) {
 
 function quizRep(st) {
   app.innerHTML = `<section class="game game-quiz">
-      <div class="game-top"><span class="eyebrow">GAME ${gameNo(st)} ・ 代表者</span><h2>❓ 早押しクイズ</h2></div>
+      <div class="game-top"><span class="label">Game ${gameNo(st)} ・ 代表者</span><h2>早押しクイズ</h2></div>
       <div id="qBox"></div>
     </section>`;
   const box = $('#qBox');
   let curKey = '__init__';
   let qctl = null;
   let introDone = false;
-  const cancelIntro = countdownOverlay(app, goTime(st), { label: '早押しクイズ', onGo() { introDone = true; sfx.go(); paint(); } });
+  const cancelIntro = countdownOverlay(app, goTime(st), { label: '早押しクイズ', sub: '問題が出たら、正しいと思う答えをタップ。回答は1回だけ', onGo() { introDone = true; sfx.go(); paint(); } });
   function paint() {
     const q = S.state?.quiz || {};
     if (!introDone) return;
@@ -555,7 +585,7 @@ function quizRep(st) {
       qctl?.destroy?.();
       curKey = q.key;
       qctl = q.key ? mountQuestion(box, q, true) : null;
-      if (!q.key) box.innerHTML = `<div class="q-wait"><div class="big-emoji">🎤</div><p>まもなく <b>第1問</b>！<br>司会者の出題を待とう</p><p class="fine">全${q.total || L.QUIZ_DEFAULT_COUNT}問・1問15秒</p></div>`;
+      if (!q.key) box.innerHTML = `<div class="q-wait"><span class="label">Stand by</span><p>まもなく <b>第1問</b> です。<br>司会者が出題すると、ここに問題と4つの答えが出ます。</p><p class="fine">全${q.total || L.QUIZ_DEFAULT_COUNT}問・1問15秒・回答は1問につき1回だけ</p></div>`;
     } else qctl?.update?.();
   }
   return { update: paint, destroy() { cancelIntro(); qctl?.destroy?.(); } };
@@ -581,7 +611,7 @@ function mountQuestion(box, q, asRep) {
     t0 = now;
     textEl.textContent = q.q?.text || '';
     choicesEl.innerHTML = L.arr(q.q?.choices).map((c, k) => `<button class="q-choice c${k}" data-k="${k}" ${asRep && !answered && !locked ? '' : 'disabled'}><span class="q-mark">${'ABCD'[k]}</span><span>${esc(c)}</span></button>`).join('');
-    if (asRep && !answered && !locked) { markProg(be, st.runId, 'g' + i); hint.textContent = '正しいと思う答えをタップ！'; }
+    if (asRep && !answered && !locked) { markProg(be, st.runId, 'g' + i); hint.textContent = '正しいと思う答えをタップ（1回だけ・変更不可）'; }
     if (locked) hint.textContent = 'この問題は表示中に再読み込みされたため回答できません（無回答扱い）';
     if (answered) markChosen();
     const loop = () => {
@@ -604,7 +634,7 @@ function mountQuestion(box, q, asRep) {
 
   function markChosen() {
     choicesEl.querySelectorAll('.q-choice').forEach(b => { b.disabled = true; if (Number(b.dataset.k) === Number(myChoice)) b.classList.add('chosen'); });
-    hint.textContent = myChoice === -1 ? '時間切れ（無回答）' : '回答しました！正解発表を待とう';
+    hint.textContent = myChoice === -1 ? '時間切れ（無回答）。次の問題を待ちましょう' : '回答しました。司会者の正解発表を待ちましょう';
   }
   function answer(k, e) {
     if (answered || t0 == null) return;
@@ -625,7 +655,7 @@ function mountQuestion(box, q, asRep) {
   function update() {
     const qq = S.state?.quiz || {};
     if (t0 == null) return;
-    if (!qq.open && asRep && !answered) { choicesEl.querySelectorAll('.q-choice').forEach(b => (b.disabled = true)); hint.textContent = '締め切り！'; }
+    if (!qq.open && asRep && !answered) { choicesEl.querySelectorAll('.q-choice').forEach(b => (b.disabled = true)); hint.textContent = '締め切りました。次の問題を待ちましょう'; }
     if (!asRep) {
       const reps = Object.values(S.state?.reps || {});
       const n = reps.filter(u => S.prog?.[u]?.[key]).length;
@@ -638,9 +668,9 @@ function mountQuestion(box, q, asRep) {
       choicesEl.querySelectorAll('.q-choice').forEach(b => { b.disabled = true; if (Number(b.dataset.k) === Number(qq.reveal)) b.classList.add('correct'); else b.classList.add('dim'); });
       if (asRep) {
         const ok = Number(myChoice) === Number(qq.reveal);
-        hint.innerHTML = ok ? '<b class="ok">⭕ 正解！</b>' : '<b class="ng">❌ 残念…</b>';
+        hint.innerHTML = ok ? '<b class="ok">正解！</b> 次の問題を待ちましょう' : '<b class="ng">不正解…</b> 次の問題で取り返しましょう';
         ok ? sfx.correct() : sfx.wrong();
-      } else { hint.textContent = '正解はこれ！'; sfx.correct(); }
+      } else { hint.textContent = '枠で囲まれたのが正解です'; sfx.correct(); }
     }
   }
   return { update, destroy() { cancelCd?.(); cancelAnimationFrame(raf); clearTimeout(limitTimer); } };
@@ -650,13 +680,14 @@ function mountQuestion(box, q, asRep) {
 function mountSpectator() {
   const st = S.state;
   const g = L.GAMES[st.game];
-  app.innerHTML = `<section class="card spec-head g-${st.game}">
-      <div class="eyebrow">LIVE ・ GAME ${gameNo(st)} / 4 ${Number(st.mult) > 1 ? '<span class="x2">×2</span>' : ''}</div>
-      <h2 class="title-md">${g.icon} ${esc(g.title)}</h2>
+  app.innerHTML = `<section class="card spec-head">
+      <span class="label">Live ・ Game ${gameNo(st)} / 4</span>
+      <h2 class="title-md">${gameTag(st.game)}${esc(g.title)}${Number(st.mult) > 1 ? '<span class="x2">得点2倍</span>' : ''}</h2>
+      <p class="fine" style="margin:6px 0 0">あなたは観戦中です。${esc(g.spec)}</p>
     </section>
     <section class="game spec spec-${st.game}" id="specStage"></section>
-    <section class="card"><div class="card-head"><h2>🎤 各チームの代表</h2><span class="chip">観戦中</span></div><div id="specReps"></div></section>
-    <p class="fine center">※ 正確な記録と順位は結果発表まで非公開</p>`;
+    <section class="card">${head('Players', '各チームの代表者', '<span class="chip">観戦中</span>')}<div id="specReps"></div></section>
+    <p class="fine center">正確な記録と順位は、結果発表まで誰にも見えません。</p>`;
   const stage = $('#specStage');
   const inner = st.game === 'ten' ? specTen(stage, st) : st.game === 'iai' ? specIai(stage, st) : st.game === 'tap' ? specTap(stage, st) : specQuiz(stage, st);
   const paintReps = () => {
@@ -667,7 +698,7 @@ function mountSpectator() {
 }
 
 function specTen(stage, st) {
-  stage.innerHTML = `<div class="ten-display spec"><span class="ten-num" id="sNum">0.00</span><span class="ten-unit">秒</span></div><p class="hint center" id="sHint">代表者の体内時計を見守ろう</p>`;
+  stage.innerHTML = `<div class="ten-display spec"><span class="ten-num" id="sNum">0.00</span><span class="ten-unit">秒</span></div><p class="hint center" id="sHint">タイマーが見えるのは最初の3秒だけ。代表者の体内時計を見守りましょう</p>`;
   const num = $('#sNum', stage);
   let raf = 0, t0 = null;
   const cancel = countdownOverlay(stage, perfAt(be, st.startAt), {
@@ -695,7 +726,7 @@ function specTen(stage, st) {
 
 function specIai(stage, st) {
   stage.innerHTML = `<div class="game-iai spec-iai" id="sIai"><div class="iai-bg"></div><div class="iai-moon"></div><div class="iai-ground"></div>
-      <div class="iai-text" id="sText">　</div><div class="iai-sub" id="sSub">静寂の中、合図を待つ…</div><div class="slash-layer" id="sSlash"></div></div>`;
+      <div class="iai-text" id="sText">　</div><div class="iai-sub" id="sSub">お静かに。代表者は「斬れ！」の合図を待っています</div><div class="slash-layer" id="sSlash"></div></div>`;
   const area = $('#sIai', stage), text = $('#sText', stage), sub = $('#sSub', stage);
   const kamaeAt = perfAt(be, st.startAt);
   const goAt = kamaeAt + (Number(st.iaiDelay) || 3000);
@@ -713,7 +744,7 @@ function specIai(stage, st) {
             queueRender();
             slashEffect($('#sSlash', stage)); sfx.slash(); flash('#fff', 200);
             text.textContent = '斬！'; text.className = 'iai-text zan';
-            sub.textContent = '勝負あり…結果は発表で！';
+            sub.textContent = '勝負あり。結果は発表で！';
           }, 1500);
         },
       });
@@ -729,7 +760,7 @@ function specIai(stage, st) {
 function specTap(stage, st) {
   stage.innerHTML = `<div class="tap-top spec"><span class="eyebrow">LIVE 連打数</span><span class="tap-time"><b id="sTime">7.00</b>秒</span></div>
     <div class="tap-bar"><i id="sBar"></i></div>
-    <div class="live-bars" id="sBars"></div><p class="hint center" id="sHint">合図と同時に連打スタート！</p>`;
+    <div class="live-bars" id="sBars"></div><p class="hint center" id="sHint">合図と同時に連打スタート。棒グラフで各チームの回数が見られます</p>`;
   let t0 = null, raf = 0, phase = 'wait';
   const cancel = countdownOverlay(stage, perfAt(be, st.startAt), {
     label: '7秒連打',
@@ -752,7 +783,7 @@ function specTap(stage, st) {
     const counts = L.TEAMS.filter(t => reps[t]).map(t => ({ t, n: Number(S.live?.[reps[t]] || 0) }));
     const max = Math.max(40, ...counts.map(c => c.n));
     $('#sBars', stage).innerHTML = counts.map(c => `<div class="lb" style="${tvars(c.t)}">${teamBadge(c.t)}<span class="lb-track"><i style="width:${phase === 'hidden' || phase === 'end' ? 100 : Math.round((c.n / max) * 100)}%" class="${phase !== 'live' ? 'secret' : ''}"></i></span><b>${phase === 'live' || phase === 'wait' ? c.n : '？？？'}</b></div>`).join('');
-    $('#sHint', stage).textContent = phase === 'hidden' ? '🔥 ラストスパート！ここからは秘密… 🔥' : phase === 'end' ? 'TIME UP！ 集計を待とう' : phase === 'live' ? '連打中！' : '合図と同時に連打スタート！';
+    $('#sHint', stage).textContent = phase === 'hidden' ? 'ラストスパート！ ここからの回数は結果発表まで秘密' : phase === 'end' ? 'TIME UP！ 集計を待ちましょう' : phase === 'live' ? '連打中！' : '合図と同時に連打スタート！';
   }
   paint();
   return {
@@ -773,7 +804,7 @@ function specQuiz(stage, st) {
     if (q.key !== cur) {
       qctl?.destroy?.(); cur = q.key;
       qctl = q.key ? mountQuestion(box, q, false) : null;
-      if (!q.key) box.innerHTML = `<div class="q-wait"><div class="big-emoji">🎤</div><p>まもなく <b>第1問</b>！</p><p class="fine">全${q.total || 3}問・1問15秒</p></div>`;
+      if (!q.key) box.innerHTML = `<div class="q-wait"><span class="label">Stand by</span><p>まもなく <b>第1問</b> です。<br>問題と選択肢はこの画面にも出ます。一緒に考えてみましょう。</p><p class="fine">全${q.total || 3}問・1問15秒</p></div>`;
     } else qctl?.update?.();
   }
   return {
@@ -788,7 +819,7 @@ function specQuiz(stage, st) {
 
 // ---------- 集計・結果 ----------
 function mountJudging() {
-  app.innerHTML = `<section class="card center judging"><div class="drum">🥁</div><h2>集計中…</h2><p>まもなく結果発表！</p><div class="wait-dots"><i></i><i></i><i></i></div></section>
+  app.innerHTML = `<section class="card center judging white">${cubeSVG()}<span class="drum">COUNTING</span><h2>集計中です</h2><p>全チームの記録を集計しています。<br>結果はみんなのスマホで同時に発表されます。</p><div class="wait-dots"><i></i><i></i><i></i></div></section>
     <div id="jScore"></div>`;
   sfx.drum(1.5);
   const paint = () => { $('#jScore').innerHTML = Object.keys(S.results || {}).length ? scoreboardHTML(S.results, S.adjust, { me: me()?.team, title: '現在の順位（今回のゲーム前）' }) : ''; };

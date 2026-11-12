@@ -1,9 +1,9 @@
 // 管理者（司会者）画面
-import { createBackend, errMsg } from './db.js';
-import * as L from './logic.js';
-import { sfx, isMuted, setMuted } from './fx.js';
-import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML } from './ui.js';
-import qrcode from './vendor/qrcode.mjs';
+import { createBackend, errMsg } from './db.js?v=3';
+import * as L from './logic.js?v=3';
+import { sfx, isMuted, setMuted } from './fx.js?v=3';
+import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON } from './ui.js?v=3';
+import qrcode from './vendor/qrcode.mjs?v=3';
 
 const root = $('#admin');
 let be = null;
@@ -59,7 +59,8 @@ async function boot() {
 
 function setupHeader() {
   const sb = $('#soundBtn');
-  const paint = () => { sb.textContent = isMuted() ? '🔇' : '🔊'; };
+  const paint = () => { sb.innerHTML = isMuted() ? ICON.soundOff : ICON.soundOn; };
+  $('#logoutBtn').innerHTML = ICON.logout;
   paint();
   sb.addEventListener('click', () => { setMuted(!isMuted()); paint(); });
   $('#logoutBtn').addEventListener('click', async () => { if (confirm('ログアウトしますか？')) { await be.signOut(); location.reload(); } });
@@ -67,7 +68,8 @@ function setupHeader() {
 
 function renderLogin() {
   root.innerHTML = `<section class="card login-card">
-      <div class="eyebrow">ADMIN</div><h2>🎙️ 司会者ログイン</h2>
+      <span class="label">Admin</span><h2>司会者ログイン</h2>
+      <p class="muted">この画面は司会者専用です。ゲームの進行・得点の操作ができます。</p>
       <form id="loginForm">
         <label class="lbl" for="em">メールアドレス</label><input id="em" class="input" type="email" autocomplete="username" required>
         <label class="lbl" for="pw">パスワード</label><input id="pw" class="input" type="password" autocomplete="current-password" required>
@@ -138,7 +140,7 @@ function queueRender() {
 }
 
 // ---------- 描画 ----------
-const TABS = [['control', '🎮 進行'], ['members', '👥 参加者'], ['score', '🏆 得点'], ['quiz', '❓ クイズ'], ['setup', '📲 QR・設定']];
+const TABS = [['control', '進行'], ['members', '参加者'], ['score', '得点'], ['quiz', 'クイズ'], ['setup', 'QR・設定']];
 
 function render() {
   if (!authed) return;
@@ -215,7 +217,8 @@ function lobbyPanel(st) {
   const allDecided = teamsWithMembers.length > 0 && decided.length === teamsWithMembers.length;
   return `
   <section class="card">
-    <div class="card-head"><h2>① 次のゲーム</h2></div>
+    ${head('Step 1', '次のゲームを確認')}
+    <p class="step-desc">ここで選んだゲームと遊び方が、参加者のスマホの待機画面にすぐ表示されます。通常は変更不要です。</p>
     <div class="grid2">
       <label class="lbl">ゲーム<select class="input" id="gameSel">${L.ROUND_GAMES.map(k => `<option value="${k}" ${g === k ? 'selected' : ''}>${L.GAMES[k].icon} ${L.GAMES[k].title}</option>`).join('')}</select></label>
       <label class="lbl">得点倍率<select class="input" id="multSel"><option value="1" ${mult === 1 ? 'selected' : ''}>×1</option><option value="2" ${mult === 2 ? 'selected' : ''}>×2（最終ゲーム）</option></select></label>
@@ -224,13 +227,13 @@ function lobbyPanel(st) {
     ${g === 'quiz' ? `
       <div class="card-head"><h3>出題する問題</h3>
         <span class="row"><select class="input input-sm" id="qCount">${Array.from({ length: L.QUIZ_MAX_COUNT }, (_, i) => `<option ${Number(draft.quizCount) === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>問
-        <button class="btn btn-sm" data-act="autoQuiz">🎲 未使用から選ぶ</button></span></div>
-      ${bank.length ? `<ol class="qpick">${bank.map(([id, q]) => `<li><label><input type="checkbox" class="qp" value="${id}" ${draft.quizPick.includes(id) ? 'checked' : ''}> ${esc(q.text)} ${q.used ? '<small class="played">使用済</small>' : ''}</label></li>`).join('')}</ol>` : '<p class="note warn">問題がありません。「❓ クイズ」タブで問題を登録してください。</p>'}
+        <button class="btn btn-sm" data-act="autoQuiz">未使用からランダムに選ぶ</button></span></div>
+      ${bank.length ? `<ol class="qpick">${bank.map(([id, q]) => `<li><label><input type="checkbox" class="qp" value="${id}" ${draft.quizPick.includes(id) ? 'checked' : ''}> ${esc(q.text)} ${q.used ? '<small class="played">使用済</small>' : ''}</label></li>`).join('')}</ol>` : '<p class="note warn">問題がありません。「クイズ」タブで問題を登録してください。</p>'}
       <p class="muted">選択中：${draft.quizPick.filter(id => D.quizBank?.[id]).length} / ${draft.quizCount}問（選んだ順に出題）</p>` : ''}
   </section>
   <section class="card">
-    <div class="card-head"><h2>② 代表者（各チームが決定）</h2><span class="chip ${allDecided ? 'ok' : 'warn'}">${decided.length}/${teamsWithMembers.length} チーム決定</span></div>
-    <p class="fine">参加者のスマホに「✋ わたしが出る！」ボタンが出ています。チームで相談して、出る人が自分で押します。</p>
+    ${head('Step 2', '代表者がそろうのを待つ', `<span class="chip ${allDecided ? 'ok' : 'warn'}">${decided.length}/${teamsWithMembers.length} チーム決定</span>`)}
+    <p class="step-desc">参加者のスマホに「わたしが出る」ボタンが出ています。チームで相談して、出る人が自分で押します。決まったチームから下に名前が出ます。</p>
     <ul class="pick-admin">${L.TEAMS.map(t => {
       const u = validPick(t);
       const ms = membersOf(t);
@@ -238,7 +241,8 @@ function lobbyPanel(st) {
         ${u ? (D.used?.[u] ? `<small class="warn">${usedRounds(u)}出場済</small>` : '<small class="ok">未出場</small>') : ''}
         <small class="muted">未出場 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}人</small></li>`;
     }).join('')}</ul>
-    <button class="btn btn-primary btn-xl" data-act="announce" ${pickedOk && decided.length ? '' : 'disabled'}>代表者を発表する ▶</button>
+    ${mcHTML([...(L.GAMES[g].mc || []), 'ルールは皆さんのスマホに出ています。チームで相談して、出る人は「わたしが出る」を押してください！'], '全チームが「決定」になったら、下のボタンで代表者を発表します。押すと全員のスマホに代表者とルールが出ます。')}
+    <button class="btn btn-primary btn-xl" data-act="announce" ${pickedOk && decided.length ? '' : 'disabled'}>代表者を発表する <span class="arr">→</span></button>
     ${allDecided ? '' : '<p class="fine warn">※ まだ決まっていないチームがあります。全チーム決まってから発表してください（未定のまま発表すると、そのチームは不参加になります）。</p>'}
     <details class="emergency"><summary>緊急用：司会者が代わりに指定する</summary>
       <p class="fine">欠席・通信トラブルなどでチームが決められないときだけ使います。指定するとそのチームのスマホにも反映されます。</p>
@@ -249,21 +253,28 @@ function lobbyPanel(st) {
           <select class="input rep-sel" data-team="${t}"><option value="">— 未定 —</option>${ms.map(m => `<option value="${m.uid}" ${sel === m.uid ? 'selected' : ''}>${esc(m.name)}${D.used?.[m.uid] ? `（${usedRounds(m.uid)}出場済）` : ''}</option>`).join('')}</select>
           <small class="muted">未出場 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}</small></div>`;
       }).join('')}</div>
-      <button class="btn btn-sm" data-act="autoReps">🎲 未定のチームを未出場者からおまかせで埋める</button>
+      <button class="btn btn-sm" data-act="autoReps">未定のチームを未出場者からランダムに指定</button>
     </details>
   </section>
   ${scoreboardHTML(D.results, D.adjust, { compact: true })}`;
 }
 
+/** 司会の読み上げ例（カンペ） */
+function mcHTML(lines, note = '') {
+  return `<div class="mc"><span class="k">MC ・ 読み上げ例</span>${lines.filter(Boolean).map(l => `<p>「${esc(l)}」</p>`).join('')}${note ? `<small>${esc(note)}</small>` : ''}</div>`;
+}
+const repNames = st => L.TEAMS.filter(t => st.reps?.[t]).map(t => `${t}チーム ${nameOf(st.reps[t])}さん`).join('、');
+
 function readyPanel(st) {
   const reps = st.reps || {};
   const okN = Object.values(reps).filter(u => D.prog?.[u]?.ok).length;
   return `<section class="card">
-    <div class="card-head"><h2>② 代表者を発表中</h2><span class="chip">準備OK ${okN}/${Object.keys(reps).length}</span></div>
-    <p class="muted">${L.GAMES[st.game].icon} ${esc(L.GAMES[st.game].title)}${Number(st.mult) > 1 ? '（得点×2）' : ''} — 全員のスマホに代表者とルールが表示されています。</p>
+    ${head('Step 3', '代表者を呼び出してスタート', `<span class="chip">準備OK ${okN}/${Object.keys(reps).length}</span>`)}
+    <p class="step-desc">${gameTag(st.game)}${esc(L.GAMES[st.game].title)}${Number(st.mult) > 1 ? '（得点2倍）' : ''}。全員のスマホに代表者と遊び方が表示されています。代表者が「準備OK」を押すと下に表示されます。</p>
     ${repMonitor(st, u => (D.prog?.[u]?.ok ? '<span class="ok">準備OK</span>' : '<span class="muted">未確認</span>'), false)}
-    <button class="btn btn-go btn-xl" data-act="start">ゲームスタート！（3秒カウント）</button>
-    <button class="btn btn-ghost" data-act="backLobby">← 代表者を選び直す</button>
+    ${mcHTML([`各チームの代表は、${repNames(st)}です！`, '代表の方は前へどうぞ。スマホの「準備OK」を押して、合図を待ってください。', L.GAMES[st.game].mcGo], 'スタートを押すと、全員のスマホで同時に3秒のカウントダウンが始まります。')}
+    <button class="btn btn-go btn-xl" data-act="start">ゲームスタート <span class="arr">→</span></button>
+    <button class="btn btn-ghost" data-act="backLobby">代表者を選び直す</button>
   </section>`;
 }
 
@@ -292,9 +303,11 @@ function runningPanel(st) {
     quizCtl = `<div class="quiz-ctl">
       ${q.key ? `<div class="qc-now"><span class="chip">第${idx + 1}問 / ${total}</span> <b>${esc(cur?.text || q.q?.text || '')}</b>
         <ol class="qc-choices">${L.arr(q.q?.choices).map((c, k) => `<li class="${cur && Number(cur.answer) === k ? 'ans' : ''}">${'ABCD'[k]}. ${esc(c)}${cur && Number(cur.answer) === k ? ' ← 正解' : ''}</li>`).join('')}</ol>
-        <p>回答 <b>${answered}</b>/${repIds.length}　${q.open ? `残り <b>${Math.ceil(leftMs / 1000)}</b>秒` : '締め切り済み'}</p></div>` : '<p class="muted">まだ出題していません。</p>'}
+        <p>回答 <b>${answered}</b>/${repIds.length}　${q.open ? `残り <b>${Math.ceil(leftMs / 1000)}</b>秒` : '締め切り済み'}</p></div>` : '<p class="muted">まだ出題していません。下のボタンで第1問を出題します。</p>'}
+      ${q.open ? mcHTML([`第${idx + 1}問！ ${cur?.text || ''}`, '15秒以内に答えてください！'], '全員が回答するか15秒たったら「正解を発表」。正解は参加者の画面で枠囲みされます。') : ''}
+      ${q.key && !q.open ? mcHTML([`正解は「${'ABCD'[Number(cur?.answer)] || ''}. ${L.arr(cur?.choices)[Number(cur?.answer)] || ''}」でした！`], next < total ? '次の問題へ進みます。' : '全問終わりました。下の「ゲーム終了・集計へ」を押します。') : ''}
       ${q.open ? `<button class="btn btn-gold btn-xl" data-act="quizReveal">正解を発表（締め切り）</button>` : ''}
-      ${!q.open && next < total ? `<button class="btn btn-go btn-xl" data-act="quizNext">第${next + 1}問を出題 ▶</button>` : ''}
+      ${!q.open && next < total ? `<button class="btn btn-go btn-xl" data-act="quizNext">第${next + 1}問を出題 <span class="arr">→</span></button>` : ''}
     </div>`;
     allDone = !q.open && next >= total;
   } else allDone = repIds.every(u => D.prog?.[u]?.res);
@@ -309,11 +322,13 @@ function runningPanel(st) {
   };
   const counting = be.serverNow() < Number(st.startAt);
   return `<section class="card">
-    <div class="card-head"><h2>③ 対戦中</h2><span class="chip">${counting ? 'カウントダウン中' : 'LIVE'}</span></div>
+    ${head('Step 4', '対戦中', `<span class="chip">${counting ? 'カウントダウン中' : 'LIVE'}</span>`)}
+    <p class="step-desc">${st.game === 'quiz' ? '1問ずつ「出題」→「正解を発表」を繰り返します。' : '代表者全員が「完了」になったら、下の「ゲーム終了・集計へ」を押します。'}記録の数字は集計まで見えません。</p>
     ${repMonitor(st, statusFn, true)}
     <p class="fine">「再挑戦を許可」：通信切れや誤操作のとき、その代表者の今回の記録を消してもう一度挑戦させます${st.game === 'quiz' ? '（クイズは表示中の問題のみ）' : ''}。</p>
     ${quizCtl}
-    <button class="btn ${allDone ? 'btn-primary' : 'btn-ghost'} btn-xl" data-act="finish">ゲーム終了・集計へ ▶</button>
+    ${st.game !== 'quiz' ? mcHTML([allDone ? '全員終了！ 集計に入ります。' : 'がんばれー！'], allDone ? '全員の記録が届きました。' : '「完了」になっていない代表者がいる間は、そのまま見守ります。') : ''}
+    <button class="btn ${allDone ? 'btn-primary' : 'btn-ghost'} btn-xl" data-act="finish">ゲーム終了・集計へ <span class="arr">→</span></button>
   </section>`;
 }
 
@@ -327,7 +342,8 @@ function judgingPanel(st) {
   const ranked = computePreview(st);
   const list = L.orderRows(ranked);
   return `<section class="card">
-    <div class="card-head"><h2>④ 集計結果（参加者にはまだ非公開）</h2></div>
+    ${head('Step 5', '集計結果を確認', '<span class="chip warn">参加者にはまだ非公開</span>')}
+    <p class="step-desc">自動で順位と得点を計算しました。通信トラブルなどで直したいときだけ「修正」で順位を変えられます。問題なければ「結果発表」へ。</p>
     <table class="tbl"><thead><tr><th>順位</th><th>チーム</th><th>記録</th><th>修正</th><th>得点</th></tr></thead><tbody>
     ${list.map(r => `<tr style="${tvars(r.team)}"><td><b>${r.rank ?? '—'}</b>${r.manual ? '<small class="warn">修正</small>' : ''}</td>
       <td>${teamBadge(r.team)} ${esc(r.name)}</td><td><small>${esc(r.detail)}</small></td>
@@ -338,9 +354,10 @@ function judgingPanel(st) {
       <td><b>${r.pts}</b></td></tr>`).join('')}
     </tbody></table>
     <p class="fine">同じ記録は同順位・同得点（次の順位は飛ばす）。フライング・記録なしは0点。${Number(st.mult) > 1 ? '今回は得点2倍。' : ''}</p>
-    <button class="btn btn-gold btn-xl" data-act="publish">結果発表！ 🎉</button>
+    ${mcHTML(['集計が終わりました。それでは結果発表です！'], '押すと全員のスマホで、5位から順に発表演出が始まります（約10秒）。')}
+    <button class="btn btn-gold btn-xl" data-act="publish">結果発表 <span class="arr">→</span></button>
     <div class="row gap">
-      <button class="btn btn-ghost" data-act="backRunning">← 対戦に戻す</button>
+      <button class="btn btn-ghost" data-act="backRunning">対戦に戻す</button>
       <button class="btn btn-danger-ghost" data-act="redo">このゲームをやり直す</button>
     </div>
   </section>`;
@@ -350,18 +367,22 @@ function resultsPanel(st) {
   const r = D.results?.['r' + st.round];
   const last = st.round >= L.TOTAL_ROUNDS;
   return `<section class="card">
-    <div class="card-head"><h2>⑤ 結果発表中</h2></div>
+    ${head('Step 6', '結果発表中')}
+    <p class="step-desc">参加者のスマホで発表演出が流れています。終わったら次のゲームへ進みます。</p>
     ${r ? `<ol class="ranklist">${L.orderRows(r.rows).map(x => `<li class="rankrow" style="${tvars(x.team)}"><span class="rk">${x.rank ?? '—'}<small>位</small></span>${teamBadge(x.team)}<span class="who">${esc(x.name)} <small class="muted">${esc(x.detail)}</small></span><b class="pts">+${x.pts}</b></li>`).join('')}</ol>` : '<p>結果データがありません</p>'}
-    <button class="btn btn-primary btn-xl" data-act="${last ? 'final' : 'next'}">${last ? '👑 総合結果発表へ ▶' : `次のゲームへ（GAME ${st.round + 1}）▶`}</button>
+    ${r ? mcHTML([`第${st.round}ゲームの1位は…${L.orderRows(r.rows).filter(x => x.rank === 1).map(x => `${x.team}チーム ${x.name}さん`).join('、')}！`, (() => { const top = L.overallRanking(L.computeTotals(D.results, D.adjust)).filter(x => x.rank === 1).map(x => x.team + 'チーム').join('・'); return `現在の総合1位は ${top} です。`; })()], last ? '次は総合結果発表です。' : '次のゲームへ進むと、参加者の画面は代表者決めに戻ります。') : ''}
+    <button class="btn btn-primary btn-xl" data-act="${last ? 'final' : 'next'}">${last ? '総合結果発表へ' : `次のゲームへ（GAME ${st.round + 1}）`} <span class="arr">→</span></button>
     <div class="row gap"><button class="btn btn-ghost" data-act="replay">発表演出をもう一度</button><button class="btn btn-ghost" data-tab="score">得点を修正する</button></div>
   </section>
   ${scoreboardHTML(D.results, D.adjust)}`;
 }
 
 function finalPanel() {
-  return `<section class="card"><div class="card-head"><h2>👑 総合結果発表中</h2></div>
-    <p>全員のスマホで総合順位を発表しています。おつかれさまでした！</p>
-    <div class="row gap"><button class="btn btn-ghost" data-act="replay">発表演出をもう一度</button><button class="btn btn-ghost" data-act="backResults">← 第4ゲーム結果に戻す</button></div>
+  const champs = L.overallRanking(L.computeTotals(D.results, D.adjust)).filter(x => x.rank === 1).map(x => x.team + 'チーム').join('・');
+  return `<section class="card">${head('Final', '総合結果発表中')}
+    <p class="step-desc">全員のスマホで総合順位を発表しています（約12秒）。おつかれさまでした。</p>
+    ${mcHTML(['それでは総合結果の発表です！', `総合優勝は……${champs}です！ おめでとうございます！`])}
+    <div class="row gap"><button class="btn btn-ghost" data-act="replay">発表演出をもう一度</button><button class="btn btn-ghost" data-act="backResults">第4ゲーム結果に戻す</button></div>
   </section>${scoreboardHTML(D.results, D.adjust, { title: '最終順位' })}`;
 }
 
@@ -370,7 +391,7 @@ function membersTab() {
   const cfg = D.config || {};
   const cap = Number(cfg.teamCap) || 5;
   return `<section class="card">
-    <div class="card-head"><h2>参加受付</h2><span class="chip ${cfg.regOpen ? 'ok' : 'warn'}">${cfg.regOpen ? '受付中' : '締切'}</span></div>
+    ${head('Entry', '参加受付', `<span class="chip ${cfg.regOpen ? 'ok' : 'warn'}">${cfg.regOpen ? '受付中' : '締切'}</span>`)}
     <div class="row gap">
       <button class="btn ${cfg.regOpen ? 'btn-ghost' : 'btn-primary'}" data-act="toggleReg">${cfg.regOpen ? '受付を締め切る' : '受付を再開する'}</button>
       <label class="row">1チームの定員 <select class="input input-sm" id="capSel">${Array.from({ length: 9 }, (_, i) => `<option ${cap === i + 1 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select>名</label>
@@ -380,7 +401,7 @@ function membersTab() {
   ${L.TEAMS.map(t => {
     const ms = membersOf(t);
     return `<section class="card team-card" style="${tvars(t)}">
-      <div class="card-head"><h2>${teamBadge(t)} チーム ${t}</h2><span class="chip ${ms.length === 4 ? 'ok' : 'warn'}">${ms.length}人</span></div>
+      <div class="card-head"><h2>${teamBadge(t)} ${t}チーム</h2><span class="chip ${ms.length === 4 ? 'ok' : 'warn'}">${ms.length}人</span></div>
       ${ms.length ? `<ul class="mlist">${ms.map(m => `<li><i class="dot ${D.online?.[m.uid] ? 'on' : ''}"></i><b>${esc(m.name)}</b>
         ${D.used?.[m.uid] ? `<small class="played">${usedRounds(m.uid)}出場</small><button class="btn btn-xs" data-act="unuse" data-uid="${m.uid}">出場済を解除</button>` : '<small class="muted">未出場</small>'}
         <button class="btn btn-xs btn-danger-ghost" data-act="kick" data-uid="${m.uid}">削除</button></li>`).join('')}</ul>` : '<p class="muted">まだいません</p>'}
@@ -394,7 +415,7 @@ function scoreTab() {
   const totals = L.computeTotals(D.results, D.adjust);
   return `${scoreboardHTML(D.results, D.adjust, { title: '総合ランキング（全員に表示中）' })}
   <section class="card">
-    <div class="card-head"><h2>ゲーム別の得点</h2></div>
+    ${head('Score', 'ゲーム別の得点')}
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>チーム</th>${rounds.map(r => `<th>G${r}</th>`).join('')}<th>調整</th><th>合計</th></tr></thead><tbody>
       ${L.TEAMS.map(t => `<tr style="${tvars(t)}"><td>${teamBadge(t)}</td>${rounds.map(r => { const x = D.results?.['r' + r]?.rows?.[t]; return `<td>${x ? `${x.pts}<small class="muted">${x.rank ? `(${x.rank}位)` : '(—)'}</small>` : '—'}</td>`; }).join('')}<td>${Number(D.adjust?.[t] || 0)}</td><td><b>${totals[t]}</b></td></tr>`).join('')}
     </tbody></table></div>
@@ -402,7 +423,7 @@ function scoreTab() {
   </section>
   ${editRound ? roundEditor(editRound) : ''}
   <section class="card">
-    <div class="card-head"><h2>調整点（ボーナス・ペナルティ）</h2></div>
+    ${head('Adjust', '調整点（ボーナス・ペナルティ）')}
     <div class="adj">${L.TEAMS.map(t => `<label class="adj-row" style="${tvars(t)}">${teamBadge(t)}<input class="input input-sm adj-in" type="number" step="1" data-team="${t}" value="${Number(D.adjust?.[t] || 0)}"></label>`).join('')}</div>
     <button class="btn btn-primary" data-act="saveAdjust">調整点を保存</button>
     <p class="fine">合計＝各ゲームの得点＋調整点。保存すると全員の画面に即反映されます。</p>
@@ -429,7 +450,7 @@ function quizTab() {
   const bank = Object.entries(D.quizBank || {});
   const ed = editQuizId ? (editQuizId === 'new' ? { text: '', choices: ['', '', '', ''], answer: 0 } : D.quizBank?.[editQuizId]) : null;
   return `<section class="card">
-    <div class="card-head"><h2>❓ 問題一覧（${bank.length}問）</h2><button class="btn btn-sm btn-primary" data-act="newQuiz">＋ 問題を追加</button></div>
+    ${head('Quiz', `問題一覧（${bank.length}問）`, '<button class="btn btn-sm btn-primary" data-act="newQuiz">＋ 問題を追加</button>')}
     <p class="fine">問題と正解は管理者だけが読めるよう保護されています。出題時は問題文と選択肢だけが参加者に送られます。</p>
     ${ed ? quizEditor(ed) : ''}
     ${bank.length ? `<ol class="qbank">${bank.map(([id, q]) => `<li><div><b>${esc(q.text)}</b> ${q.used ? '<small class="played">使用済</small>' : ''}</div>
@@ -454,19 +475,19 @@ function setupTab() {
   let svg = '';
   try { const qr = qrcode(0, 'M'); qr.addData(PLAYER_URL); qr.make(); svg = qr.createSvgTag({ cellSize: 8, margin: 3, scalable: true }); } catch (e) { svg = '<p>QR生成エラー</p>'; }
   return `<section class="card center qr-card">
-    <div class="card-head"><h2>📲 参加用QRコード</h2></div>
+    ${head('Entry QR', '参加用QRコード')}
     <div class="qr-box">${svg}</div>
     <p class="url">${esc(PLAYER_URL)}</p>
     <div class="row gap center"><button class="btn" data-act="copyUrl">URLをコピー</button><button class="btn btn-ghost" data-act="bigQr">QRを全画面表示</button></div>
     <p class="fine">Wi-Fi共通でなくてもOK。各自のスマホのモバイル回線で参加できます。LINE等でQRを読んだ場合も、そのまま開いたアプリで最後まで遊んでください。</p>
   </section>
   <section class="card">
-    <div class="card-head"><h2>🔗 URL</h2></div>
+    ${head('URL', 'URL')}
     <p>参加者用：<a href="${esc(PLAYER_URL)}" target="_blank" rel="noopener">${esc(PLAYER_URL)}</a></p>
     <p>管理者用：<a href="${esc(ADMIN_URL)}">${esc(ADMIN_URL)}</a></p>
   </section>
   <section class="card danger-zone">
-    <div class="card-head"><h2>⚠️ リセット</h2></div>
+    ${head('Reset', 'リセット')}
     <button class="btn btn-danger-ghost" data-act="redo">このゲームをやり直す（記録を消して代表者発表から）</button>
     <button class="btn btn-danger-ghost" data-act="resetScores">得点・出場履歴をリセット（参加者は残す）</button>
     <button class="btn btn-danger" data-act="resetAll">全データ初期化（参加者も削除）</button>

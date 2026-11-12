@@ -1,9 +1,9 @@
 // 通しテスト用：疑似参加者（ボット）とセキュリティ検査
 // 管理者でログイン済みのブラウザでのみ動作する（admin.html で先にログイン）
-import { createBackend, errMsg } from './db.js';
-import * as L from './logic.js';
-import { joinTeam, submitResult, markProg, sendLive } from './actions.js';
-import { $, esc } from './ui.js';
+import { createBackend, errMsg } from './db.js?v=3';
+import * as L from './logic.js?v=3';
+import { joinTeam, submitResult, markProg, sendLive } from './actions.js?v=3';
+import { $, esc } from './ui.js?v=3';
 
 const log = (msg, cls = '') => {
   const el = document.createElement('div');
@@ -141,7 +141,7 @@ async function expect(name, promise, shouldPass) {
   try { await promise; } catch (e) { ok = false; msg = e?.code || e?.message || String(e); }
   const pass = ok === shouldPass;
   const row = document.createElement('tr');
-  row.innerHTML = `<td>${pass ? '✅' : '❌'}</td><td>${esc(name)}</td><td>${shouldPass ? '許可されるべき' : '拒否されるべき'}</td><td><small>${ok ? '許可された' : '拒否: ' + esc(msg)}</small></td>`;
+  row.innerHTML = `<td>${pass ? '<b class="ok">OK</b>' : '<b class="ng">NG</b>'}</td><td>${esc(name)}</td><td>${shouldPass ? '許可されるべき' : '拒否されるべき'}</td><td><small>${ok ? '許可された' : '拒否: ' + esc(msg)}</small></td>`;
   $('#secRows').appendChild(row);
   return pass;
 }

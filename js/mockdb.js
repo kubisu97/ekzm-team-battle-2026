@@ -1,6 +1,6 @@
 // テスト専用：localhost のモックサーバー（tests/mock-server.mjs）につなぐバックエンド。
 // 本番（GitHub Pages）では読み込まれない。
-import { ADMIN_UID } from './firebase-config.js';
+import { ADMIN_UID } from './firebase-config.js?v=3';
 
 const TS = { '.sv': 'timestamp' };
 let snapshot = {};
