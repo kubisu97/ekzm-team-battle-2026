@@ -5,24 +5,26 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
 <title>EKZM TEAM BATTLE 2026 テストツール</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700&family=Noto+Sans+JP:wght@400;700;800;900&family=Yuji+Syuku&display=swap" media="print" onload="this.media='all'">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23f4eee7%27/%3E%3Crect x=%274%27 y=%2710%27 width=%2711%27 height=%2711%27 fill=%27%23dbdcdc%27/%3E%3Crect x=%2715%27 y=%2716%27 width=%276%27 height=%276%27 fill=%27%23009844%27/%3E%3Crect x=%2722%27 y=%2716%27 width=%276%27 height=%276%27 fill=%27%23e50012%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=3">
 <style>.logline{font:12px/1.5 ui-monospace,monospace;border-bottom:1px solid var(--line);padding:2px 0}.logline.ok{color:var(--ok)}.logline.ng{color:var(--ng)}#log{max-height:260px;overflow:auto}</style>
 </head>
 <body class="admin">
-<header class="topbar"><div class="logo"><b>EKZM</b><span>TEST TOOLS（リハーサル専用）</span></div></header>
+<header class="topbar"><div class="topbar-in"><span class="logo" aria-label="EKZM テストツール"><span class="mark"><i></i><i></i><i></i></span><b>EKZM</b><span>テストツール</span></span></div></header>
 <main class="wrap">
-  <section class="card"><h2>🧪 通しテスト用ツール</h2>
+  <section class="card"><span class="label">Rehearsal</span><h2>通しテスト用ツール</h2>
     <p id="gate" class="note">確認中…</p>
     <p class="fine">疑似参加者（ボット）を作り、管理画面から4ゲームを進行して動作を確かめるためのページです。本番前に管理画面の「全データ初期化」でボットを消してください。</p>
   </section>
-  <section class="card"><div class="card-head"><h2>🤖 ボット</h2><span class="row"><input id="botN" class="input input-sm" type="number" min="1" max="25" value="20"> 体
+  <section class="card"><div class="card-head"><h2>ボット</h2><span class="row"><input id="botN" class="input input-sm" type="number" min="1" max="25" value="20"> 体
     <button class="btn btn-primary btn-sm" id="startBtn" data-need-admin disabled>起動</button><button class="btn btn-sm" id="stopBtn">自動プレイ停止</button></span></div>
     <label class="row fine"><input type="checkbox" id="autoPick" checked> 代表が未定のチームでは、未出場のボットが6〜15秒後に自動で立候補する（人間の参加者が先に押せばそちらが優先）</label>
     <div id="bots"></div></section>
-  <section class="card"><div class="card-head"><h2>🔐 セキュリティ検査</h2><span class="row"><button class="btn btn-sm" id="secBtn" data-need-admin disabled>検査を実行</button><button class="btn btn-sm" id="dupBtn" data-need-admin disabled>二重送信テスト</button></span></div>
+  <section class="card"><div class="card-head"><h2>セキュリティ検査</h2><span class="row"><button class="btn btn-sm" id="secBtn" data-need-admin disabled>検査を実行</button><button class="btn btn-sm" id="dupBtn" data-need-admin disabled>二重送信テスト</button></span></div>
     <table class="tbl"><thead><tr><th></th><th>操作</th><th>期待</th><th>結果</th></tr></thead><tbody id="secRows"></tbody></table></section>
-  <section class="card"><h2>📜 ログ</h2><div id="log"></div></section>
+  <section class="card"><h2>ログ</h2><div id="log"></div></section>
 </main>
-<script type="module" src="js/bots.js?v=2"></script>
+<script type="module" src="js/bots.js?v=3"></script>
 </body>
 </html>
