@@ -8,9 +8,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const TEAMS = ['A', 'B', 'C', 'D', 'E'];
 const errors = [];
 
+// 任意：FONT_DIR（@fontsource のフォルダ）を指定すると Web フォントもローカルから読み込んで、本番に近い見た目でスクリーンショットを撮る
+const FONT_DIR = process.env.FONT_DIR;
+let FONT_CSS = '';
+if (FONT_DIR) {
+  const path = require('path');
+  const css = (pkg, f) => fs.readFileSync(path.join(FONT_DIR, pkg, f), 'utf8').replace(/url\(\.\/files\//g, `url(https://fontfiles.local/${pkg}/files/`);
+  FONT_CSS = ['500.css', '600.css', '700.css'].map(f => css('jost', f)).join('\n') + css('yuji-syuku', 'index.css') +
+    [[400, 'Noto Sans CJK JP'], [700, 'Noto Sans CJK JP Bold'], [800, 'Noto Sans CJK JP Bold'], [900, 'Noto Sans CJK JP Black']]
+      .map(([w, n]) => `@font-face{font-family:'Noto Sans JP';font-weight:${w};src:local('${n}')}`).join('\n');
+}
+
 async function newPage(ctx, name) {
   const p = await ctx.newPage();
-  await p.route('**/*', r => (r.request().url().startsWith(BASE) ? r.continue() : r.abort()));
+  await p.route('**/*', r => {
+    const u = r.request().url();
+    if (u.startsWith(BASE)) return r.continue();
+    if (FONT_CSS && u.startsWith('https://fonts.googleapis.com/')) return r.fulfill({ contentType: 'text/css', body: FONT_CSS });
+    if (FONT_CSS && u.startsWith('https://fontfiles.local/')) return r.fulfill({ path: require('path').join(FONT_DIR, new URL(u).pathname), contentType: 'font/woff2' });
+    return r.abort();
+  });
   p.on('pageerror', e => errors.push(`[${name}] pageerror: ${e.message}`));
   p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push(`[${name}] console: ${m.text()}`); });
   p.on('dialog', d => d.accept(d.type() === 'prompt' ? (d.message().includes('初期化') ? '初期化' : 'リセット') : undefined));
