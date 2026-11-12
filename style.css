@@ -31,10 +31,17 @@
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--bg); color: var(--navy); font-family: var(--font); line-height: 1.7; overscroll-behavior-y: none; overflow-x: clip; }
+body { word-break: auto-phrase; overflow-wrap: anywhere; line-break: strict; margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--bg); color: var(--navy); font-family: var(--font); line-height: 1.7; overscroll-behavior-y: none; overflow-x: clip; }
 a { color: var(--blue); }
 button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3, p { margin: 0 0 8px; }
+h1, h2, h3, .title-xl, .title-lg, .title-md, .pick-now { text-wrap: balance; }
+.nw { white-space: nowrap; }
+.seg { display: inline-block; max-width: 100%; }
+button, input, select, textarea { -webkit-appearance: none; appearance: none; }
+select.input { background-image: linear-gradient(45deg, transparent 50%, var(--navy) 50%), linear-gradient(135deg, var(--navy) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 32px; }
+input[type=checkbox] { -webkit-appearance: auto; appearance: auto; }
+input[type=radio] { -webkit-appearance: auto; appearance: auto; }
 h2 { font-size: 18px; line-height: 1.45; font-weight: 800; }
 h3 { font-size: 15px; font-weight: 800; }
 small { font-size: .82em; }
@@ -130,6 +137,37 @@ textarea.input { resize: vertical; }
 .lbl { display: block; font-size: 13px; font-weight: 700; margin: 14px 0 6px; }
 .lbl .input { margin-top: 6px; }
 
+/* ---------- いまやること（常に画面上部に表示） ---------- */
+.nowbar { position: sticky; top: calc(60px + env(safe-area-inset-top)); z-index: 35; max-width: 600px; margin: 0 auto; padding: 0 14px; }
+.nowbar:empty { display: none; }
+.now { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--white); border: 1.5px solid var(--navy); box-shadow: 0 3px 0 var(--navy); }
+.now .tag { flex: none; font-family: var(--en); font-weight: 600; font-size: 11px; letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; background: var(--navy); color: #fff; white-space: nowrap; }
+.now .txt { min-width: 0; }
+.now .txt b { display: block; font-size: 15px; line-height: 1.4; }
+.now .txt small { display: block; color: var(--ink-60); font-size: 12px; line-height: 1.45; margin-top: 1px; }
+.now.act { background: var(--brown); border-color: var(--navy); color: #fff; }
+.now.act .tag { background: #fff; color: var(--brown); }
+.now.act .txt small { color: rgba(255, 255, 255, .85); }
+.now.wait .tag { background: var(--ink-60); }
+.now.mine { background: var(--navy); color: #fff; }
+.now.mine .tag { background: var(--yellow); color: var(--navy); }
+.now.mine .txt small { color: rgba(255, 255, 255, .8); }
+body[data-view="run"].is-rep .nowbar, body.fullgame .nowbar { display: none; }
+.progress { display: flex; justify-content: center; align-items: center; gap: 5px; margin: 4px 0 10px; }
+.progress em { font-style: normal; font-family: var(--en); font-weight: 600; font-size: 11.5px; letter-spacing: .08em; color: var(--ink-60); margin-right: 2px; }
+.progress span { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line-2); font-family: var(--en); font-weight: 600; font-size: 12.5px; color: var(--ink-40); background: var(--white); }
+.progress span.done { border-color: var(--navy); color: var(--navy); background: var(--surface); }
+.progress span.cur { border-color: var(--navy); background: var(--navy); color: #fff; }
+details.more { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.more > summary { cursor: pointer; list-style: none; font-weight: 800; font-size: 14px; color: var(--brown); display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: '+'; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--brown); font-family: var(--en); font-size: 14px; line-height: 1; }
+details.more[open] > summary::before { content: '−'; }
+.field-step { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 16px 0 8px; font-weight: 800; font-size: 14px; text-align: left; }
+.field-step i { font-style: normal; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--navy); font-family: var(--en); font-weight: 600; font-size: 12px; background: var(--white); }
+.field-step.done i { background: var(--green); border-color: var(--green); color: #fff; }
+.field-step small { font-weight: 400; color: var(--ink-60); }
+
 /* ---------- 説明（遊び方・ながれ） ---------- */
 .howto { list-style: none; margin: 4px 0 0; padding: 0; counter-reset: st; }
 .howto li { position: relative; padding: 2px 0 12px 42px; font-size: 14.5px; line-height: 1.65; }
@@ -187,8 +225,8 @@ textarea.input { resize: vertical; }
 .wait-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--navy); animation: bounce 1.2s infinite; }
 .wait-dots i:nth-child(2) { animation-delay: .15s; background: var(--green); }
 .wait-dots i:nth-child(3) { animation-delay: .3s; background: var(--red); }
-.roster { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.roster-team { border-radius: 10px; padding: 8px 10px; background: var(--white); border: 1px solid var(--line); border-top: 4px solid var(--tc); }
+.roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.roster-team { min-width: 0; border-radius: 10px; padding: 8px 10px; background: var(--white); border: 1px solid var(--line); border-top: 4px solid var(--tc); }
 .roster-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 12px; color: var(--ink-60); }
 .roster-head .tbadge { width: 24px; height: 24px; font-size: 13px; border-radius: 6px; }
 .roster ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
@@ -316,6 +354,7 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 .tap-pad:disabled { background: var(--gray); color: var(--ink-40); }
 .tap-pad.live:active { transform: translate(5px, 5px); box-shadow: 3px 3px 0 var(--navy); }
 .tap-top.spec { margin-top: 4px; }
+.game-tap > .hint { margin-top: 16px; }
 .live-bars { display: grid; gap: 10px; margin: 14px 0; }
 .lb { display: grid; grid-template-columns: 30px 1fr 64px; align-items: center; gap: 10px; }
 .lb-track { height: 22px; border-radius: 999px; background: var(--white); border: 1.5px solid var(--navy); overflow: hidden; }
@@ -333,7 +372,7 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 .q-text { font-size: 20px; font-weight: 800; line-height: 1.55; min-height: 2.4em; margin-bottom: 14px; }
 .q-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 4px 4px 0; }
 .q-choice {
-  display: flex; align-items: center; gap: 8px; min-height: 84px; padding: 10px; border-radius: 14px; cursor: pointer; text-align: left;
+  position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 84px; padding: 10px; border-radius: 14px; cursor: pointer; text-align: left; overflow-wrap: break-word; word-break: normal;
   font-weight: 800; font-size: 16px; border: 2px solid var(--navy); color: #fff; touch-action: manipulation; box-shadow: 4px 4px 0 var(--navy); transition: transform .06s, box-shadow .06s, opacity .3s;
 }
 .q-choice.c0 { background: #d9483b; }
@@ -343,11 +382,12 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 .q-choice:disabled { cursor: default; }
 .q-choice.chosen { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--navy); outline: 3px solid var(--brown); outline-offset: 2px; }
 .q-choice.correct { outline: 4px solid var(--navy); outline-offset: 3px; }
-.q-choice.correct::after { content: '正解'; margin-left: auto; background: var(--white); color: var(--navy); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+.q-choice.correct::after { content: '正解'; position: absolute; top: -11px; right: 8px; white-space: nowrap; background: var(--white); color: var(--navy); border: 2px solid var(--navy); border-radius: 999px; padding: 1px 9px; font-size: 12px; line-height: 1.5; }
 .q-choice.dim { opacity: .3; }
 .q-mark { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: rgba(255, 255, 255, .85); color: var(--navy); font-family: var(--en); font-weight: 700; }
 .q-wait { text-align: center; padding: 22px 6px; }
-.q-answered { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
+.q-answered { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
+.q-answered > span:first-child { margin-right: 4px; white-space: nowrap; }
 .ans-chip { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--navy); color: var(--navy); font-family: var(--en); font-weight: 700; opacity: .4; background: var(--white); }
 .ans-chip.on { background: var(--tc); color: var(--tct, #fff); opacity: 1; }
 
@@ -366,7 +406,7 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 .reveal-title h2 { font-size: 22px; font-weight: 900; margin: 4px 0 14px; }
 .reveal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column-reverse; gap: 8px; }
 .reveal-item {
-  display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; text-align: left; background: var(--surface);
+  display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; text-align: left; background: var(--surface); min-width: 0; max-width: 100%; overflow: hidden;
   border: 1px solid var(--line); border-left: 6px solid var(--tc);
   opacity: 0; transform: translateY(10px); transition: opacity .45s, transform .45s cubic-bezier(.2, 1.2, .4, 1);
 }
@@ -376,7 +416,8 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 .reveal-item.first .rk { color: var(--brown); font-size: 32px; }
 .reveal-item.me { box-shadow: inset 0 0 0 2px var(--brown); }
 .reveal-item .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.reveal-item .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reveal-item .who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.reveal-item .who small { line-height: 1.45; }
 .reveal-item .who small { color: var(--ink-60); }
 .gain { font-family: var(--en); font-weight: 600; font-size: 22px; }
 .gain small { font-size: 11px; color: var(--ink-60); }
@@ -439,6 +480,15 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 .qr-full-in svg { width: min(86vw, 80vh); height: auto; }
 .qr-full p { font-size: 22px; font-weight: 900; margin: 6px 0; }
 .edit-card { border: 1.5px solid var(--brown); }
+.jlist { list-style: none; margin: 0; padding: 0; }
+.jrow { display: grid; grid-template-columns: 40px 1fr auto; grid-template-areas: 'rk who pts' 'rk det det' 'rk ovr ovr'; gap: 2px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.jrow .rk { grid-area: rk; text-align: center; min-width: 0; }
+.jrow .jwho { grid-area: who; display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 800; }
+.jrow .jwho span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jrow .jdet { grid-area: det; font-size: 12.5px; color: var(--ink-60); }
+.jrow .jovr { grid-area: ovr; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-60); }
+.jrow .jpts { grid-area: pts; font-family: var(--en); font-weight: 600; font-size: 20px; }
+@media (pointer: coarse) { .input, .input-sm, select { font-size: 16px; } }
 .step-desc { font-size: 13.5px; color: var(--ink-60); margin: -4px 0 10px; }
 
 /* ---------- 演出 ---------- */
@@ -470,3 +520,21 @@ body.fullgame .game-iai:not(.spec-iai), body.fullgame .game-tap { position: fixe
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 @media (max-width: 480px) { .logo span { display: none; } .me-name { max-width: 28vw; } }
 @media (max-width: 380px) { .team-btn b { font-size: 22px; } .q-choice { min-height: 72px; font-size: 14px; } .grid2 { grid-template-columns: 1fr; } .me-name { max-width: 22vw; } }
+
+/* ---------- スマホ向けの調整（最後に置いて上書き） ---------- */
+@media (max-width: 640px) {
+  .status-card { position: static; }
+  .tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; overflow: visible; }
+  .tab { padding: 7px 2px; font-size: 12.5px; text-align: center; white-space: nowrap; }
+}
+@media (max-width: 400px) {
+  .reveal-item { gap: 8px; padding: 10px; }
+  .reveal-item .rk, .rankrow .rk { min-width: 36px; font-size: 20px; }
+  .reveal-item.first .rk { font-size: 26px; }
+  .gain { font-size: 18px; }
+  .pts { min-width: 54px; font-size: 18px; }
+  .card { padding: 16px 13px; }
+  .now .txt b { font-size: 14px; }
+  .ans-chip { width: 23px; height: 23px; font-size: 12px; }
+  .q-choice { flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; min-height: 78px; padding: 9px 10px; font-size: 15px; line-height: 1.35; }
+}
