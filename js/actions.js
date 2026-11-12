@@ -1,5 +1,5 @@
 // 参加者側の書き込み処理（参加画面とテスト用ボットで共通利用）
-import { TEAMS, cleanName } from './logic.js?v=3';
+import { TEAMS, cleanName } from './logic.js?v=4';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

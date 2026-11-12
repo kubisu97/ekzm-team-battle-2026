@@ -1,9 +1,9 @@
 // 管理者（司会者）画面
-import { createBackend, errMsg } from './db.js?v=3';
-import * as L from './logic.js?v=3';
-import { sfx, isMuted, setMuted } from './fx.js?v=3';
-import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON } from './ui.js?v=3';
-import qrcode from './vendor/qrcode.mjs?v=3';
+import { createBackend, errMsg } from './db.js?v=4';
+import * as L from './logic.js?v=4';
+import { sfx, isMuted, setMuted } from './fx.js?v=4';
+import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML } from './ui.js?v=4';
+import qrcode from './vendor/qrcode.mjs?v=4';
 
 const root = $('#admin');
 let be = null;
@@ -238,8 +238,8 @@ function lobbyPanel(st) {
       const u = validPick(t);
       const ms = membersOf(t);
       return `<li style="${tvars(t)}">${teamBadge(t)}<b>${u ? esc(nameOf(u)) : '<span class="muted">相談中…</span>'}</b>
-        ${u ? (D.used?.[u] ? `<small class="warn">${usedRounds(u)}出場済</small>` : '<small class="ok">未出場</small>') : ''}
-        <small class="muted">未出場 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}人</small></li>`;
+        ${u ? (D.used?.[u] ? `<small class="warn">決定（${usedRounds(u)}出場済）</small>` : '<small class="ok">決定</small>') : ''}
+        <small class="muted">まだ出てない人 ${ms.filter(m => !D.used?.[m.uid]).length}/${ms.length}</small></li>`;
     }).join('')}</ul>
     ${mcHTML([...(L.GAMES[g].mc || []), 'ルールは皆さんのスマホに出ています。チームで相談して、出る人は「わたしが出る」を押してください！'], '全チームが「決定」になったら、下のボタンで代表者を発表します。押すと全員のスマホに代表者とルールが出ます。')}
     <button class="btn btn-primary btn-xl" data-act="announce" ${pickedOk && decided.length ? '' : 'disabled'}>代表者を発表する <span class="arr">→</span></button>
@@ -344,15 +344,19 @@ function judgingPanel(st) {
   return `<section class="card">
     ${head('Step 5', '集計結果を確認', '<span class="chip warn">参加者にはまだ非公開</span>')}
     <p class="step-desc">自動で順位と得点を計算しました。通信トラブルなどで直したいときだけ「修正」で順位を変えられます。問題なければ「結果発表」へ。</p>
-    <table class="tbl"><thead><tr><th>順位</th><th>チーム</th><th>記録</th><th>修正</th><th>得点</th></tr></thead><tbody>
-    ${list.map(r => `<tr style="${tvars(r.team)}"><td><b>${r.rank ?? '—'}</b>${r.manual ? '<small class="warn">修正</small>' : ''}</td>
-      <td>${teamBadge(r.team)} ${esc(r.name)}</td><td><small>${esc(r.detail)}</small></td>
-      <td><select class="input input-sm ovr" data-team="${r.team}">
-        <option value="auto" ${!draft.overrides[r.team] || draft.overrides[r.team] === 'auto' ? 'selected' : ''}>自動(${r.autoRank ?? '—'})</option>
-        ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${draft.overrides[r.team] === String(n) ? 'selected' : ''}>${n}位</option>`).join('')}
-        <option value="dq" ${draft.overrides[r.team] === 'dq' ? 'selected' : ''}>失格(0点)</option></select></td>
-      <td><b>${r.pts}</b></td></tr>`).join('')}
-    </tbody></table>
+    <ul class="jlist">
+    ${list.map(r => `<li class="jrow" style="${tvars(r.team)}">
+      <span class="rk">${r.rank ?? '—'}<small>${r.rank ? '位' : ''}</small></span>
+      <span class="jwho">${teamBadge(r.team)}<span>${esc(r.name)}</span>${r.manual ? '<small class="warn">修正</small>' : ''}</span>
+      <b class="jpts">${r.pts}<small>pt</small></b>
+      <span class="jdet">${detailHTML(r.detail)}</span>
+      <label class="jovr">順位の修正
+        <select class="input input-sm ovr" data-team="${r.team}">
+          <option value="auto" ${!draft.overrides[r.team] || draft.overrides[r.team] === 'auto' ? 'selected' : ''}>自動（${r.autoRank ? r.autoRank + '位' : '—'}）</option>
+          ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${draft.overrides[r.team] === String(n) ? 'selected' : ''}>${n}位にする</option>`).join('')}
+          <option value="dq" ${draft.overrides[r.team] === 'dq' ? 'selected' : ''}>失格（0点）</option></select></label>
+    </li>`).join('')}
+    </ul>
     <p class="fine">同じ記録は同順位・同得点（次の順位は飛ばす）。フライング・記録なしは0点。${Number(st.mult) > 1 ? '今回は得点2倍。' : ''}</p>
     ${mcHTML(['集計が終わりました。それでは結果発表です！'], '押すと全員のスマホで、5位から順に発表演出が始まります（約10秒）。')}
     <button class="btn btn-gold btn-xl" data-act="publish">結果発表 <span class="arr">→</span></button>
@@ -369,7 +373,7 @@ function resultsPanel(st) {
   return `<section class="card">
     ${head('Step 6', '結果発表中')}
     <p class="step-desc">参加者のスマホで発表演出が流れています。終わったら次のゲームへ進みます。</p>
-    ${r ? `<ol class="ranklist">${L.orderRows(r.rows).map(x => `<li class="rankrow" style="${tvars(x.team)}"><span class="rk">${x.rank ?? '—'}<small>位</small></span>${teamBadge(x.team)}<span class="who">${esc(x.name)} <small class="muted">${esc(x.detail)}</small></span><b class="pts">+${x.pts}</b></li>`).join('')}</ol>` : '<p>結果データがありません</p>'}
+    ${r ? `<ol class="ranklist">${L.orderRows(r.rows).map(x => `<li class="rankrow" style="${tvars(x.team)}"><span class="rk">${x.rank ?? '—'}<small>位</small></span>${teamBadge(x.team)}<span class="who">${esc(x.name)} <small class="muted">${detailHTML(x.detail)}</small></span><b class="pts">+${x.pts}</b></li>`).join('')}</ol>` : '<p>結果データがありません</p>'}
     ${r ? mcHTML([`第${st.round}ゲームの1位は…${L.orderRows(r.rows).filter(x => x.rank === 1).map(x => `${x.team}チーム ${x.name}さん`).join('、')}！`, (() => { const top = L.overallRanking(L.computeTotals(D.results, D.adjust)).filter(x => x.rank === 1).map(x => x.team + 'チーム').join('・'); return `現在の総合1位は ${top} です。`; })()], last ? '次は総合結果発表です。' : '次のゲームへ進むと、参加者の画面は代表者決めに戻ります。') : ''}
     <button class="btn btn-primary btn-xl" data-act="${last ? 'final' : 'next'}">${last ? '総合結果発表へ' : `次のゲームへ（GAME ${st.round + 1}）`} <span class="arr">→</span></button>
     <div class="row gap"><button class="btn btn-ghost" data-act="replay">発表演出をもう一度</button><button class="btn btn-ghost" data-tab="score">得点を修正する</button></div>
@@ -435,11 +439,11 @@ function roundEditor(r) {
   if (!res) return '';
   return `<section class="card edit-card">
     <div class="card-head"><h2>G${r} ${esc(L.GAMES[res.game]?.title || '')} の結果を修正</h2><button class="btn btn-xs" data-act="closeEdit">閉じる</button></div>
-    <table class="tbl"><thead><tr><th>チーム</th><th>順位</th><th>得点</th></tr></thead><tbody>
-    ${L.TEAMS.filter(t => res.rows?.[t]).map(t => { const x = res.rows[t]; return `<tr style="${tvars(t)}"><td>${teamBadge(t)} ${esc(x.name)}<br><small class="muted">${esc(x.detail)}</small></td>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>チーム</th><th>順位</th><th>得点</th></tr></thead><tbody>
+    ${L.TEAMS.filter(t => res.rows?.[t]).map(t => { const x = res.rows[t]; return `<tr style="${tvars(t)}"><td>${teamBadge(t)} ${esc(x.name)}<br><small class="muted">${detailHTML(x.detail)}</small></td>
       <td><select class="input input-sm er-rank" data-team="${t}"><option value="">—</option>${[1, 2, 3, 4, 5].map(n => `<option ${Number(x.rank) === n ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
-      <td><input class="input input-sm er-pts" type="number" data-team="${t}" value="${Number(x.pts) || 0}"></td></tr>`; }).join('')}
-    </tbody></table>
+      <td><input class="input input-sm er-pts" type="number" inputmode="numeric" data-team="${t}" value="${Number(x.pts) || 0}" style="width:90px"></td></tr>`; }).join('')}
+    </tbody></table></div>
     <div class="row gap"><button class="btn btn-sm" data-act="autoPts" data-round="${r}">順位から得点を再計算</button><button class="btn btn-primary" data-act="saveRound" data-round="${r}">修正を保存</button></div>
     <p class="fine">倍率 ×${Number(res.mult) || 1}。保存すると全員の総合ランキングに即反映されます。</p>
   </section>`;

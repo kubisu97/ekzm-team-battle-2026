@@ -172,7 +172,7 @@ export function buildRows(game, reps, members, subs, opts = {}) {
         row.status = 'ok';
         row.metric = diff;
         const sign = v >= TEN_TARGET ? '+' : '−';
-        row.detail = `${secs(v)}秒（誤差 ${sign}${secs(diff)}秒）`;
+        row.detail = `誤差 ${sign}${secs(diff)}秒（記録 ${secs(v)}秒）`;
       } else if (game === 'iai') {
         if (s.res.f === true || v < IAI_FOUL_MS) {
           row.status = 'foul';

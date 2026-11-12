@@ -1,12 +1,17 @@
 // 参加者画面・管理画面で共通の表示部品
-import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=3';
-import { sfx, confetti, vibrate } from './fx.js?v=3';
+import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=4';
+import { sfx, confetti, vibrate } from './fx.js?v=4';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 export function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** 記録の説明文を、区切りの良いところでだけ折り返すように整形（例：「誤差 −0.12秒」「（記録 9.88秒）」） */
+export function detailHTML(d) {
+  return String(d ?? '').split(/(?=（)|(?<=・)/).map(x => `<span class="seg">${esc(x)}</span>`).join('');
 }
 
 export const tvars = t => `--tc:${TEAM_INFO[t]?.color || '#888'};--tct:${TEAM_INFO[t]?.text || '#fff'};--tg:${TEAM_INFO[t]?.glow || 'transparent'};--tcd:${t === 'B' ? '#9a6f00' : TEAM_INFO[t]?.color || '#888'}`;
@@ -37,14 +42,31 @@ export function pointsHTML(mult = 1) {
 }
 
 /** ゲームの遊び方（手順・順位の決め方・注意） */
-export function howtoHTML(key, { mult = 1, role = 'all' } = {}) {
+export function howtoHTML(key, { mult = 1, role = 'all', open = false } = {}) {
   const g = GAMES[key];
   if (!g) return '';
+  // 手順（3ステップ）は常に表示。細かいルールは「くわしく」に畳んで、画面を短くする
   return `<ol class="howto">${g.howto.map(h => `<li>${h}</li>`).join('')}</ol>
-    <div class="infobox"><span class="k">順位の決め方</span>${esc(g.judge)}</div>
-    <div class="infobox ${key === 'iai' ? 'alert' : ''}"><span class="k">${key === 'iai' ? '注意' : 'ポイント'}</span>${esc(g.tips)}</div>
-    ${role !== 'rep' ? `<div class="infobox"><span class="k">観戦する人は</span>${esc(g.spec)}</div>` : ''}
-    <div class="infobox"><span class="k">得点${Number(mult) > 1 ? `（このゲームは${mult}倍）` : ''}</span>${pointsHTML(mult)}</div>`;
+    ${key === 'iai' ? `<div class="infobox alert"><span class="k">注意</span>${esc(g.tips)}</div>` : ''}
+    <details class="more" ${open ? 'open' : ''}><summary>順位の決め方・得点をくわしく見る</summary>
+      <div class="infobox"><span class="k">順位の決め方</span>${esc(g.judge)}</div>
+      ${key !== 'iai' ? `<div class="infobox"><span class="k">ポイント</span>${esc(g.tips)}</div>` : ''}
+      ${role !== 'rep' ? `<div class="infobox"><span class="k">観戦する人は</span>${esc(g.spec)}</div>` : ''}
+      <div class="infobox"><span class="k">得点${Number(mult) > 1 ? `（このゲームは${mult}倍）` : ''}</span>${pointsHTML(mult)}</div>
+    </details>`;
+}
+
+/** 4ゲームの進み具合 */
+export function progressHTML(round, phase) {
+  return `<div class="progress" aria-label="4ゲーム中${round}ゲーム目"><em>GAME</em>${[1, 2, 3, 4].map(n => {
+    const cls = n < round || (n === round && (phase === 'results' || phase === 'final')) ? 'done' : n === round ? 'cur' : '';
+    return `<span class="${cls}">${n}</span>`;
+  }).join('')}</div>`;
+}
+
+/** 画面上部の「いまやること」 */
+export function nowHTML({ tag = 'いま', title, sub = '', kind = '' }) {
+  return `<div class="now ${kind}"><span class="tag">${esc(tag)}</span><span class="txt"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span></div>`;
 }
 
 /** 全体の遊び方（ヘルプ） */
@@ -157,7 +179,7 @@ export function mountRoundReveal(host, { be, result, round, results, adjust, rev
         <li class="reveal-item ${r.rank === 1 ? 'first' : ''} ${me === r.team ? 'me' : ''}" style="${tvars(r.team)}">
           <span class="rk">${r.rank ? `${r.rank}<small>位</small>` : '<small>失格</small>'}</span>
           ${teamBadge(r.team)}
-          <span class="who"><b>${esc(r.name)}</b><small>${esc(r.detail)}</small></span>
+          <span class="who"><b>${esc(r.name)}</b><small>${detailHTML(r.detail)}</small></span>
           <b class="gain">+${r.pts}</b>
         </li>`).join('')}</ol>
     </section><div class="reveal-after"></div>`;
@@ -193,7 +215,7 @@ export function mountFinalReveal(host, { be, results, adjust, revealAt, members 
   const ranking = overallRanking(totals);
   const seq = [...ranking].reverse();
   const champs = ranking.filter(r => r.rank === 1);
-  const memberNames = t => Object.values(members || {}).filter(m => m.team === t).map(m => esc(m.name)).join('・');
+  const memberNames = t => { const ns = Object.values(members || {}).filter(m => m.team === t).map(m => m.name); return ns.map((n, i) => `<span class="seg">${esc(n)}${i < ns.length - 1 ? '・' : ''}</span>`).join(''); };
   host.innerHTML = `<section class="card final-card">
       <div class="reveal-title"><span class="label">Final Result</span><h2>総合結果発表</h2><p class="fine" style="margin-top:-6px">4ゲームの合計点で順位が決まりました。5位から順に発表します。</p></div>
       <ol class="reveal-list final">${seq.map(r => `
