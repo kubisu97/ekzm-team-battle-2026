@@ -13,7 +13,7 @@ test('10秒：誤差の小さい順、同誤差は同順位・同得点、次は
   assert.equal(r.C.rank, 3); assert.equal(r.C.pts, 50);
   assert.equal(r.D.rank, 4); assert.equal(r.D.pts, 30);
   assert.equal(r.E.rank, 5); assert.equal(r.E.pts, 10);
-  assert.match(r.A.detail, /誤差 \+0\.050/);
+  assert.match(r.A.detail, /誤差 \+0\.050秒/);
   assert.match(r.B.detail, /誤差 −0\.050/);
 });
 
