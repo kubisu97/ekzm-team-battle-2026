@@ -42,6 +42,7 @@ tests/                ロジック・ルールの単体試験、モックサー�
 2. 「QR・設定」タブの QR を全画面表示 → 参加者に読み取ってもらう。
 3. 参加者は名前とチーム（A〜E）を選んで参加。「参加者」タブで人数を確認し、揃ったら「受付を締め切る」。
 4. 「🎮 進行」タブで各ゲームを進行：
+   0. （任意）「説明を全員のスマホに出す」で説明スライドを開始。「次へ」で全員のページが一緒に進み、読み上げ文も管理画面に出る。第1ゲームの前は「大会の説明」→「GAME 01 の説明」の順がおすすめ。代表者発表・スタートで自動的に閉じる
    1. 次のゲームを確認（必要なら変更）。各チームは参加者のスマホの「わたしが出る」で代表者を自分たちで決める。管理画面で全チーム「決定」になったら「代表者を発表する」
       - 欠席・通信トラブルでチームが決められないときだけ「緊急用：司会者が代わりに指定する」を使う
    2. 代表者が「準備OK」を押したら「ゲームスタート！」（3秒カウントダウン）
@@ -94,6 +95,23 @@ tests/                ロジック・ルールの単体試験、モックサー�
 
 同時接続100、保存1GB、ダウンロード10GB/月。20〜25台の参加なら十分に収まります（1端末＝1接続、タブを複数開くとその分増えます）。
 
+## Web制作クイズ（10問）の出典
+
+「クイズ」タブの「Web制作クイズ（10問）を登録する／に入れ替える」で登録されます。正解と解説は次の公式情報で確認しています（2026年11月確認）。
+
+| 問題 | 出典 |
+|---|---|
+| HTMLの「M」 | [MDN: HTML](https://developer.mozilla.org/en-US/docs/Web/HTML)、[W3C: CSS1（用語定義）](https://www.w3.org/TR/CSS1/) |
+| CSSの「C」・CSS1の勧告日 | [W3C: CSS](https://www.w3.org/Style/CSS/)、[W3C: CSS1](https://www.w3.org/TR/CSS1/) |
+| 404の意味 | [MDN: 404 Not Found](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/404)（規格は RFC 9110） |
+| SEOの「O」 | [Google 検索セントラル: SEO スターター ガイド](https://developers.google.com/search/docs/fundamentals/seo-starter-guide) |
+| Googleの社名の由来・旧名 | [Google: Our story](https://about.google/company-info/our-story/) |
+| JavaScriptの試作時の名前 | [Brendan Eich: Popularity（2008年）](https://brendaneich.com/2008/04/popularity/) |
+| faviconの「fav」 | [MDN: Favicon](https://developer.mozilla.org/en-US/docs/Glossary/Favicon) |
+| .tv の国 | [IANA: .tv](https://www.iana.org/domains/root/db/tv.html) |
+| IE11のサポート終了 | [Microsoft Lifecycle: Internet Explorer 11](https://learn.microsoft.com/en-us/lifecycle/products/internet-explorer-11) |
+| 最初のWebサイト | [CERN: A short history of the Web](https://home.cern/science/computing/the-birth-of-the-web/short-history-web/) |
+
 ## 開発者向け：ローカル試験
 
 ```bash
@@ -102,6 +120,7 @@ node tests/mock-server.mjs . 8080       # モックサーバー（Firebase の�
 node tests/e2e.cjs                      # Playwright で管理者1+参加者10の4ゲーム通し試験
 node tests/e2e-edge.cjs                 # フライング・再挑戦・やり直し等の例外系
 node tests/audit-layout.cjs             # iPhone SE〜iPhone 13 の画面幅で、はみ出し・崩れを全画面チェック
+node tests/e2e-explain.cjs              # 説明スライドの同時表示・クイズ解説の表示
 ```
 
 `?mock` を付けて localhost で開くとモックサーバーに接続します（本番では無効）。モックの管理者パスワードは `mock` です。
