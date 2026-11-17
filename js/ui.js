@@ -1,6 +1,6 @@
 // 参加者画面・管理画面で共通の表示部品
-import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=4';
-import { sfx, confetti, vibrate } from './fx.js?v=4';
+import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=5';
+import { sfx, confetti, vibrate } from './fx.js?v=5';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -40,6 +40,28 @@ export function pointsHTML(mult = 1) {
   const m = Number(mult) || 1;
   return `<div class="points">${POINTS.map((p, i) => `<div><b>${p * m}</b><small>${i + 1}位</small></div>`).join('')}</div>`;
 }
+
+/** 説明スライド1枚分（参加者の全画面表示と、管理画面のプレビューで共通） */
+export function explainSlideHTML(sl) {
+  if (!sl) return '';
+  const games = () => `<ol class="xs-games">${['ten', 'quiz', 'iai', 'tap'].map(k => `<li><span class="gnum">GAME ${GAMES[k].num}</span><span class="xg-t"><b>${esc(GAMES[k].title)}</b>${k === 'tap' ? '<em class="x2">得点2倍</em>' : ''}<small>${esc(GAMES[k].lead)}</small></span></li>`).join('')}</ol>`;
+  return `<div class="xs">
+    <p class="xs-kicker">${esc(sl.kicker)}</p>
+    ${sl.hero ? `<p class="xs-hero">GAME <b>${esc(sl.hero)}</b></p>` : ''}
+    <h2 class="xs-title">${esc(sl.title)}</h2>
+    ${sl.lead ? `<p class="xs-lead">${esc(sl.lead)}</p>` : ''}
+    ${sl.teams ? `<div class="xs-teams">${TEAMS.map(t => `<span class="tbadge" style="${tvars(t)}">${t}</span>`).join('')}</div>` : ''}
+    ${sl.games ? games() : ''}
+    ${sl.steps?.length ? `<ol class="xs-steps">${sl.steps.map(x => `<li>${x}</li>`).join('')}</ol>` : ''}
+    ${sl.list?.length ? `<ul class="xs-list">${sl.list.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}
+    ${sl.points ? pointsHTML(sl.points) : ''}
+    ${sl.warn ? `<p class="xs-warn">${esc(sl.warn)}</p>` : ''}
+    ${sl.note ? `<p class="xs-note">${esc(sl.note)}</p>` : ''}
+  </div>`;
+}
+
+/** 説明スライドの見出し（「大会の説明」「GAME 02 早押しクイズの説明」） */
+export const explainName = key => key === 'opening' ? '大会の説明' : `GAME ${GAMES[key]?.num || ''} ${GAMES[key]?.title || ''}の説明`;
 
 /** ゲームの遊び方（手順・順位の決め方・注意） */
 export function howtoHTML(key, { mult = 1, role = 'all', open = false } = {}) {

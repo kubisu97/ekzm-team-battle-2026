@@ -1,13 +1,14 @@
 // 参加者・観戦画面
-import { createBackend, errMsg } from './db.js?v=4';
-import * as L from './logic.js?v=4';
-import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=4';
-import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js?v=4';
+import { createBackend, errMsg } from './db.js?v=5';
+import * as L from './logic.js?v=5';
+import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=5';
+import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js?v=5';
 import {
   $, esc, tvars, teamBadge, toast, perfAt, waitUntil, countdownOverlay,
   scoreboardHTML, mountRoundReveal, mountFinalReveal, rosterHTML,
   head, gameTag, cubeSVG, ICON, howtoHTML, pointsHTML, openHelp, progressHTML, nowHTML,
-} from './ui.js?v=4';
+  explainSlideHTML, explainName,
+} from './ui.js?v=5';
 
 const params = new URLSearchParams(location.search);
 const slotParam = (params.get('p') || '').replace(/[^\w-]/g, '').slice(0, 12);
@@ -130,6 +131,55 @@ function render() {
   if (key !== view.key) mount(key);
   else if (view.ctl?.update?.() === 'remount') mount(key);
   paintNow();
+  paintExplain();
+}
+
+// ---------- 説明スライド（司会者が管理画面で出す。全員のスマホに同じページが同時に出る） ----------
+let explainShown = null;
+const myTeamPicked = () => { const t = me()?.team; const u = t && S.pick?.[t]; return !!(u && S.members?.[u]?.team === t); };
+let explainClosed = null; // 代表者が準備OKを押すために、そのページだけ自分で閉じた
+function paintExplain() {
+  const st = S.state;
+  const ex = st?.explain;
+  const pageKey = ex?.key ? `${ex.key}|${ex.page}|${st.phase}` : null;
+  const show = !!(ex?.key && me() && L.EXPLAIN_PHASES.includes(st.phase) && explainClosed !== pageKey);
+  let el = $('#explain');
+  if (!show) {
+    if (el) { el.id = ''; el.classList.add('out'); setTimeout(() => el.remove(), 260); }
+    document.body.classList.remove('explaining');
+    explainShown = null;
+    return;
+  }
+  const slides = L.explainSlides(ex.key, { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase });
+  if (!slides.length) return;
+  const page = Math.min(Math.max(Number(ex.page) || 0, 0), slides.length - 1);
+  const k = `${ex.key}|${page}|${slides.length}|${st.phase}|${isRep() ? 'rep' : ''}|${S.prog?.[uid]?.ok ? 'ok' : ''}|${myTeamPicked() ? 'p' : ''}`;
+  if (el && k === explainShown) return;
+  const first = !el;
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'explain';
+    el.className = 'explain';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    document.body.appendChild(el);
+  }
+  explainShown = k;
+  // 最後のページ（代表者決め・準備OK）では、自分の画面だけ閉じて操作できるボタンを出す
+  const sl = slides[page];
+  const closeBtn = sl.action === 'pick' && !myTeamPicked() ? '<button class="btn btn-primary btn-block" id="explainClose">閉じて代表者を決める</button>'
+    : sl.action === 'ok' && isRep() && !S.prog?.[uid]?.ok ? '<button class="btn btn-primary btn-block" id="explainClose">閉じて「準備OK」を押す</button>' : '';
+  el.innerHTML = `<div class="explain-in">
+      <div class="explain-top"><span class="explain-badge">説明中</span><b>${esc(explainName(ex.key))}</b><span class="explain-page">${page + 1}<small> / ${slides.length}</small></span></div>
+      <div class="explain-dots" aria-hidden="true">${slides.map((_, i) => `<i class="${i < page ? 'done' : i === page ? 'cur' : ''}"></i>`).join('')}</div>
+      <div class="explain-body" aria-live="polite">${explainSlideHTML(slides[page])}</div>
+      <p class="explain-foot">司会者の説明に合わせて、ページが自動で進みます</p>
+      ${closeBtn}
+    </div>`;
+  $('#explainClose', el)?.addEventListener('click', () => { explainClosed = pageKey; paintExplain(); });
+  el.scrollTop = 0;
+  document.body.classList.add('explaining');
+  first ? sfx.reveal() : sfx.choose();
 }
 
 // ---------- いまやること（画面上部に常に表示して、次の行動を迷わせない） ----------
@@ -654,6 +704,7 @@ function mountQuestion(box, q, asRep) {
       <div class="q-text" id="qText">　</div>
       <div class="q-choices" id="qChoices"></div>
       <p class="hint" id="qHint"></p>
+      <p class="q-note" id="qNote" hidden></p>
       ${asRep ? '' : '<div id="qAnswered" class="q-answered"></div>'}
     </div>`;
   const textEl = $('#qText', box), choicesEl = $('#qChoices', box), hint = $('#qHint', box), tbar = $('#qTimeBar', box);
@@ -723,6 +774,8 @@ function mountQuestion(box, q, asRep) {
         hint.innerHTML = ok ? '<b class="ok">正解！</b> 次の問題を待ちましょう' : '<b class="ng">不正解…</b> 次の問題で取り返しましょう';
         ok ? sfx.correct() : sfx.wrong();
       } else { hint.textContent = '枠で囲まれたのが正解です'; sfx.correct(); }
+      const noteEl = $('#qNote', box);
+      if (noteEl && qq.note) { noteEl.innerHTML = `<b>解説</b>${esc(qq.note)}`; noteEl.hidden = false; }
     }
   }
   return { update, destroy() { cancelCd?.(); cancelAnimationFrame(raf); clearTimeout(limitTimer); } };

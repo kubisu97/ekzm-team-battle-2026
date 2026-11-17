@@ -1,9 +1,9 @@
 // 管理者（司会者）画面
-import { createBackend, errMsg } from './db.js?v=4';
-import * as L from './logic.js?v=4';
-import { sfx, isMuted, setMuted } from './fx.js?v=4';
-import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML } from './ui.js?v=4';
-import qrcode from './vendor/qrcode.mjs?v=4';
+import { createBackend, errMsg } from './db.js?v=5';
+import * as L from './logic.js?v=5';
+import { sfx, isMuted, setMuted } from './fx.js?v=5';
+import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=5';
+import qrcode from './vendor/qrcode.mjs?v=5';
 
 const root = $('#admin');
 let be = null;
@@ -24,17 +24,28 @@ let dirtyWhileFocused = false;
 const PLAYER_URL = new URL('./', location.href).href.split('?')[0].replace(/admin\.html$/, '');
 const ADMIN_URL = new URL('admin.html', PLAYER_URL).href;
 
-const SAMPLE_QUIZ = [
-  { text: '日本で一番大きい湖は？', choices: ['琵琶湖', '霞ヶ浦', 'サロマ湖', '猪苗代湖'], answer: 0 },
-  { text: '日本で一番高い山は？', choices: ['北岳', '富士山', '奥穂高岳', '槍ヶ岳'], answer: 1 },
-  { text: '12月の和風月名は？', choices: ['霜月', '神無月', '師走', '睦月'], answer: 2 },
-  { text: '太陽系で一番大きな惑星は？', choices: ['土星', '天王星', '海王星', '木星'], answer: 3 },
-  { text: 'サッカーで1チームがフィールドに出せる人数は？（GK含む）', choices: ['11人', '10人', '9人', '12人'], answer: 0 },
-  { text: '元素記号「Fe」が表す元素は？', choices: ['フッ素', '鉄', '金', '鉛'], answer: 1 },
-  { text: '将棋で対局開始時に1人が並べる駒の数は？', choices: ['16枚', '18枚', '20枚', '22枚'], answer: 2 },
-  { text: '「HTML」の「M」は何の略？', choices: ['Machine', 'Media', 'Module', 'Markup'], answer: 3 },
-  { text: 'CSSで文字の色を指定するプロパティは？', choices: ['color', 'font-color', 'text-color', 'foreground'], answer: 0 },
-  { text: '1ダースは何個？', choices: ['10個', '12個', '20個', '24個'], answer: 1 },
+// Web制作にちなんだクイズ（正解・解説は公式情報で確認済み。出典は README に記載）
+const WEB_QUIZ = [
+  { text: '「HTML」の「M」は何の略？', choices: ['Machine', 'Media', 'Markup', 'Module'], answer: 2,
+    note: 'HTMLは HyperText Markup Language（ハイパーテキスト・マークアップ・ランゲージ）の略です。' },
+  { text: '「CSS」の最初の「C」は何の略？', choices: ['Creative', 'Cascading', 'Computer', 'Color'], answer: 1,
+    note: 'Cascading Style Sheets の略。W3Cが最初のCSS（CSS1）を勧告したのは1996年12月です。' },
+  { text: 'Webページで「404」エラーが出たときの意味は？', choices: ['ページが見つからない', 'サーバーが混雑している', 'アクセスが禁止されている', '通信が暗号化されていない'], answer: 0,
+    note: '404 Not Found。サーバーが、指定されたページを見つけられなかったという意味です。' },
+  { text: '「SEO」の「O」は何の略？', choices: ['Operation', 'Online', 'Organization', 'Optimization'], answer: 3,
+    note: 'Search Engine Optimization（検索エンジン最適化）の略です。' },
+  { text: '「Google」という社名の由来は？', choices: ['1の後ろに0が100個続く数', '創業者の飼い犬の名前', '「探す」という意味の古語', '検索窓の形'], answer: 0,
+    note: 'Google公式サイトによると、1の後ろに0が100個続く数を表す数学の言葉をもじった名前。もとの名前は「Backrub」でした。' },
+  { text: 'JavaScriptが試作されていたときの名前は？', choices: ['Latte', 'Mocha', 'Espresso', 'JavaLite'], answer: 1,
+    note: '開発者ブレンダン・アイク本人のブログによると、1995年5月に試作していたときの名前は「Mocha（モカ）」でした。' },
+  { text: '「favicon（ファビコン）」の「fav」は何の略？', choices: ['famous', 'fast view', 'favorite', 'feature'], answer: 2,
+    note: 'favorite icon の略。ブラウザのタブやブックマークに出る小さなアイコンのことです。' },
+  { text: 'ドメイン「.tv」は、どこの国の国別ドメイン？', choices: ['タイ', '台湾', 'トルコ', 'ツバル'], answer: 3,
+    note: '南太平洋の島国ツバルの国別ドメインです。IANAの登録情報でも、管理者はツバルの政府機関になっています。' },
+  { text: 'Internet Explorer 11（デスクトップ版）のサポートが終了したのは？', choices: ['2018年', '2020年', '2022年', '2024年'], answer: 2,
+    note: 'Microsoftの公式情報によると、Windows 10 向けのサポートは2022年6月15日に終了しました。' },
+  { text: '世界で最初のWebサイトが作られた研究機関は？', choices: ['NASA', 'MIT', 'スタンフォード大学', 'CERN'], answer: 3,
+    note: 'CERN（欧州原子核研究機構）。1990年末に最初のWebサーバーが動き始め、最初のWebサイトのアドレスは info.cern.ch でした。' },
 ];
 
 // ---------- 起動 ----------
@@ -160,6 +171,7 @@ function render() {
         <span class="chip phase ph-${st.phase}">${esc(L.PHASE_LABEL[st.phase] || st.phase)}</span>
         <span class="chip">${L.GAMES[st.game]?.icon || ''} ${esc(L.GAMES[st.game]?.title || '')}${Number(st.mult) > 1 ? ' ×' + st.mult : ''}</span>
         <span class="chip">参加 ${nMembers}人・接続 ${nOnline}</span>
+        ${st.explain?.key && L.EXPLAIN_PHASES.includes(st.phase) ? `<span class="chip ok">説明スライド表示中 ${(Number(st.explain.page) || 0) + 1}ページ目</span>` : ''}
       </div>
     </section>
     <nav class="tabs">${TABS.map(([k, l]) => `<button class="tab ${tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</nav>
@@ -187,6 +199,47 @@ const nameOf = uid => D.members?.[uid]?.name ?? '（退出）';
 // ----- 進行タブ -----
 function controlTab() {
   const st = D.state;
+  return explainCard(st) + phasePanel(st);
+}
+
+/** 説明スライドの操作（全員のスマホに同じページを出す） */
+function explainCard(st) {
+  if (!L.EXPLAIN_PHASES.includes(st.phase)) return '';
+  const ex = st.explain;
+  const g = L.GAMES[st.game];
+  const opts = { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase };
+  if (!ex?.key) {
+    const first = st.round === 1 && st.phase === 'lobby';
+    const nOpen = L.explainSlides('opening', opts).length;
+    const nGame = L.explainSlides(st.game, opts).length;
+    return `<section class="card explain-ctl">
+      ${head('Explain', '説明を全員のスマホに出す')}
+      <p class="step-desc">押すと、参加者全員のスマホが説明スライドに切り替わります。この画面で「次へ」を押すと、全員のページが一緒に進みます。読み上げる文もここに出ます。</p>
+      <div class="xbtns">
+        ${first ? `<button class="btn btn-primary btn-block" data-act="explainOpen" data-key="opening">大会の説明を始める（${nOpen}ページ）</button>` : ''}
+        <button class="btn ${first ? 'btn-ghost' : 'btn-primary'} btn-block" data-act="explainOpen" data-key="${esc(st.game)}">GAME ${g.num}「${esc(g.title)}」の説明を始める（${nGame}ページ）</button>
+        ${first ? '' : '<button class="btn btn-ghost btn-sm" data-act="explainOpen" data-key="opening">大会全体の説明をもう一度出す</button>'}
+      </div>
+      ${first ? '<p class="fine">おすすめの順番：①大会の説明 → ②GAME 01 の説明 → ③チームで代表者決め</p>' : ''}
+    </section>`;
+  }
+  const slides = L.explainSlides(ex.key, opts);
+  const page = Math.min(Math.max(Number(ex.page) || 0, 0), slides.length - 1);
+  const sl = slides[page];
+  const last = page >= slides.length - 1;
+  return `<section class="card explain-ctl live">
+    ${head('Explain', `${esc(explainName(ex.key))}を表示中`, `<span class="chip ok">${page + 1} / ${slides.length}</span>`)}
+    <div class="xpreview" aria-label="参加者のスマホに出ている画面">${explainSlideHTML(sl)}</div>
+    ${mcHTML(sl?.mc || [], last ? '最後のページです。「説明を終わる」で全員のスマホが元の画面に戻ります。' : '読み終わったら「次へ」。全員のスマホのページが進みます。')}
+    <div class="xnav">
+      <button class="btn btn-ghost" data-act="explainMove" data-d="-1" ${page === 0 ? 'disabled' : ''}>← 前へ</button>
+      ${last ? '<button class="btn btn-primary" data-act="explainClose">説明を終わる</button>' : '<button class="btn btn-go" data-act="explainMove" data-d="1">次へ <span class="arr">→</span></button>'}
+    </div>
+    ${last ? '' : '<button class="btn btn-ghost btn-sm" data-act="explainClose">途中で説明を閉じる</button>'}
+  </section>`;
+}
+
+function phasePanel(st) {
   if (draft.forRound !== st.round + ':' + st.phase && st.phase === 'lobby') {
     draft.forRound = st.round + ':' + st.phase;
     draft.overrides = {};
@@ -305,7 +358,7 @@ function runningPanel(st) {
         <ol class="qc-choices">${L.arr(q.q?.choices).map((c, k) => `<li class="${cur && Number(cur.answer) === k ? 'ans' : ''}">${'ABCD'[k]}. ${esc(c)}${cur && Number(cur.answer) === k ? ' ← 正解' : ''}</li>`).join('')}</ol>
         <p>回答 <b>${answered}</b>/${repIds.length}　${q.open ? `残り <b>${Math.ceil(leftMs / 1000)}</b>秒` : '締め切り済み'}</p></div>` : '<p class="muted">まだ出題していません。下のボタンで第1問を出題します。</p>'}
       ${q.open ? mcHTML([`第${idx + 1}問！ ${cur?.text || ''}`, '15秒以内に答えてください！'], '全員が回答するか15秒たったら「正解を発表」。正解は参加者の画面で枠囲みされます。') : ''}
-      ${q.key && !q.open ? mcHTML([`正解は「${'ABCD'[Number(cur?.answer)] || ''}. ${L.arr(cur?.choices)[Number(cur?.answer)] || ''}」でした！`], next < total ? '次の問題へ進みます。' : '全問終わりました。下の「ゲーム終了・集計へ」を押します。') : ''}
+      ${q.key && !q.open ? mcHTML([`正解は「${'ABCD'[Number(cur?.answer)] || ''}. ${L.arr(cur?.choices)[Number(cur?.answer)] || ''}」でした！`, cur?.note || ''], (cur?.note ? '解説は全員のスマホにも出ています。' : '') + (next < total ? '次の問題へ進みます。' : '全問終わりました。下の「ゲーム終了・集計へ」を押します。')) : ''}
       ${q.open ? `<button class="btn btn-gold btn-xl" data-act="quizReveal">正解を発表（締め切り）</button>` : ''}
       ${!q.open && next < total ? `<button class="btn btn-go btn-xl" data-act="quizNext">第${next + 1}問を出題 <span class="arr">→</span></button>` : ''}
     </div>`;
@@ -452,16 +505,18 @@ function roundEditor(r) {
 // ----- クイズタブ -----
 function quizTab() {
   const bank = Object.entries(D.quizBank || {});
-  const ed = editQuizId ? (editQuizId === 'new' ? { text: '', choices: ['', '', '', ''], answer: 0 } : D.quizBank?.[editQuizId]) : null;
+  const ed = editQuizId ? (editQuizId === 'new' ? { text: '', choices: ['', '', '', ''], answer: 0, note: '' } : D.quizBank?.[editQuizId]) : null;
   return `<section class="card">
     ${head('Quiz', `問題一覧（${bank.length}問）`, '<button class="btn btn-sm btn-primary" data-act="newQuiz">＋ 問題を追加</button>')}
     <p class="fine">問題と正解は管理者だけが読めるよう保護されています。出題時は問題文と選択肢だけが参加者に送られます。</p>
     ${ed ? quizEditor(ed) : ''}
     ${bank.length ? `<ol class="qbank">${bank.map(([id, q]) => `<li><div><b>${esc(q.text)}</b> ${q.used ? '<small class="played">使用済</small>' : ''}</div>
       <div class="qb-ch">${L.arr(q.choices).map((c, k) => `<span class="${Number(q.answer) === k ? 'ans' : ''}">${'ABCD'[k]}. ${esc(c)}</span>`).join('')}</div>
+      ${q.note ? `<p class="qb-note">解説：${esc(q.note)}</p>` : ''}
       <div class="row gap"><button class="btn btn-xs" data-act="editQuiz" data-id="${id}">編集</button>${q.used ? `<button class="btn btn-xs" data-act="unuseQuiz" data-id="${id}">使用済を解除</button>` : ''}<button class="btn btn-xs btn-danger-ghost" data-act="delQuiz" data-id="${id}">削除</button></div></li>`).join('')}</ol>`
     : '<p class="muted">まだ問題がありません。</p>'}
-    <button class="btn btn-ghost" data-act="sampleQuiz">サンプル問題（${SAMPLE_QUIZ.length}問）を追加</button>
+    <button class="btn ${bank.length ? 'btn-ghost' : 'btn-primary'}" data-act="sampleQuiz">${bank.length ? `Web制作クイズ（${WEB_QUIZ.length}問）に入れ替える` : `Web制作クイズ（${WEB_QUIZ.length}問）を登録する`}</button>
+    <p class="fine">Web制作にちなんだ問題${WEB_QUIZ.length}問（解説つき）です。入れ替えると、今ある問題はすべて削除されます。</p>
   </section>`;
 }
 
@@ -470,6 +525,7 @@ function quizEditor(q) {
     <label class="lbl">問題文<textarea class="input" id="qeText" rows="2" maxlength="120" required>${esc(q.text)}</textarea></label>
     ${[0, 1, 2, 3].map(k => `<label class="qe-row"><input type="radio" name="qeAns" value="${k}" ${Number(q.answer) === k ? 'checked' : ''}><span>${'ABCD'[k]}</span><input class="input qe-c" data-k="${k}" maxlength="40" value="${esc(q.choices?.[k] || '')}" required></label>`).join('')}
     <p class="fine">●を付けた選択肢が正解です。</p>
+    <label class="lbl">解説（任意・正解発表のときに全員のスマホに出ます）<textarea class="input" id="qeNote" rows="2" maxlength="120">${esc(q.note || '')}</textarea></label>
     <div class="row gap"><button class="btn btn-primary" type="submit">保存</button><button class="btn btn-ghost" type="button" data-act="cancelQuiz">キャンセル</button></div>
   </form>`;
 }
@@ -542,6 +598,24 @@ root.addEventListener('click', async e => {
 const newRunId = () => 'run' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 const ACTIONS = {
+  async explainOpen(b) {
+    const key = b.dataset.key;
+    if (key !== 'opening' && !L.GAMES[key]) throw new Error('説明が見つかりません');
+    if (!L.EXPLAIN_PHASES.includes(D.state?.phase)) throw new Error('ゲーム中は説明を出せません');
+    await be.update({ 'state/explain': { key, page: 0, at: be.TS }, 'state/updatedAt': be.TS });
+    window.scrollTo(0, 0);
+  },
+  async explainMove(b) {
+    const st = D.state;
+    const ex = st?.explain;
+    if (!ex?.key) return;
+    const n = L.explainSlides(ex.key, { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase }).length;
+    const page = Math.min(Math.max((Number(ex.page) || 0) + Number(b.dataset.d || 1), 0), n - 1);
+    await be.update({ 'state/explain/page': page, 'state/updatedAt': be.TS });
+  },
+  async explainClose() {
+    await be.update({ 'state/explain': null, 'state/updatedAt': be.TS });
+  },
   async autoReps() {
     const up = {};
     for (const t of L.TEAMS) {
@@ -576,12 +650,12 @@ const ACTIONS = {
     const runId = newRunId();
     const up = {
       'state/phase': 'ready', 'state/reps': reps, 'state/repOf': repOf,
-      'state/runId': runId, 'state/startAt': 0, 'state/iaiDelay': 0, 'state/revealAt': 0, 'state/updatedAt': be.TS, 'state/quiz': null,
+      'state/runId': runId, 'state/startAt': 0, 'state/iaiDelay': 0, 'state/revealAt': 0, 'state/updatedAt': be.TS, 'state/quiz': null, 'state/explain': null,
     };
     if (st.game === 'quiz') {
       const ids = draft.quizPick.filter(id => D.quizBank?.[id]).slice(0, draft.quizCount);
       if (ids.length !== Number(draft.quizCount)) throw new Error(`問題を${draft.quizCount}問選んでください`);
-      up[`adminOnly/quizRun/${runId}`] = ids.map(id => ({ id, text: D.quizBank[id].text, choices: L.arr(D.quizBank[id].choices), answer: Number(D.quizBank[id].answer) }));
+      up[`adminOnly/quizRun/${runId}`] = ids.map(id => ({ id, text: D.quizBank[id].text, choices: L.arr(D.quizBank[id].choices), answer: Number(D.quizBank[id].answer), note: D.quizBank[id].note || null }));
       up['state/quiz'] = { total: ids.length, idx: -1, open: false };
     }
     await be.update(up);
@@ -600,6 +674,7 @@ const ACTIONS = {
       'state/phase': 'running',
       'state/startAt': be.serverNow() + L.COUNTDOWN_MS,
       'state/iaiDelay': L.randomInt(L.IAI_MIN_DELAY, L.IAI_MAX_DELAY),
+      'state/explain': null,
       'state/updatedAt': be.TS,
     });
     sfx.go();
@@ -625,7 +700,7 @@ const ACTIONS = {
     const answered = reps.filter(u => D.prog?.[u]?.[q.key]).length;
     const left = Number(q.at) + L.QUIZ_LIMIT - be.serverNow();
     if (answered < reps.length && left > 0 && !confirm(`まだ${reps.length - answered}人が回答していません（残り${Math.ceil(left / 1000)}秒）。締め切って正解を発表しますか？`)) return;
-    await be.update({ 'state/quiz/open': false, 'state/quiz/reveal': Number(src.answer), 'state/updatedAt': be.TS });
+    await be.update({ 'state/quiz/open': false, 'state/quiz/reveal': Number(src.answer), 'state/quiz/note': src.note || null, 'state/updatedAt': be.TS });
     if (src.id && D.quizBank?.[src.id]) be.set(`quizBank/${src.id}/used`, true).catch(() => {});
   },
   async retryOne(b) {
@@ -693,7 +768,7 @@ const ACTIONS = {
     if (!confirm(`GAME ${st.round}（${L.GAMES[st.game].title}）をやり直します。今回の記録${st.phase === 'results' ? 'と発表済みの結果' : ''}を消して、代表者発表の状態に戻します。よろしいですか？`)) return;
     const runId = newRunId();
     const up = {
-      'state/phase': 'ready', 'state/runId': runId, 'state/startAt': 0, 'state/revealAt': 0, 'state/updatedAt': be.TS,
+      'state/phase': 'ready', 'state/runId': runId, 'state/startAt': 0, 'state/revealAt': 0, 'state/explain': null, 'state/updatedAt': be.TS,
       [`subs/${st.runId}`]: null, [`prog/${st.runId}`]: null, [`live/${st.runId}`]: null,
     };
     if (st.game === 'quiz') {
@@ -758,10 +833,13 @@ const ACTIONS = {
   },
   async unuseQuiz(b) { await be.set(`quizBank/${b.dataset.id}/used`, false); },
   async sampleQuiz() {
-    const up = {};
-    SAMPLE_QUIZ.forEach((q, i) => { up[`quizBank/qs${Date.now().toString(36)}${i}`] = { ...q, used: false }; });
-    await be.update(up);
-    toast('サンプル問題を追加しました', 'ok');
+    const n = Object.keys(D.quizBank || {}).length;
+    if (n && !confirm(`今ある問題${n}問を削除して、Web制作クイズ${WEB_QUIZ.length}問に入れ替えます。よろしいですか？`)) return;
+    const bank = {};
+    WEB_QUIZ.forEach((q, i) => { bank['w' + String(i + 1).padStart(2, '0')] = { ...q, used: false }; });
+    await be.set('quizBank', bank);
+    draft.quizPick = [];
+    toast(`Web制作クイズ${WEB_QUIZ.length}問を登録しました`, 'ok');
   },
   async copyUrl() {
     try { await navigator.clipboard.writeText(PLAYER_URL); toast('URLをコピーしました', 'ok'); } catch { prompt('このURLをコピーしてください', PLAYER_URL); }
@@ -807,10 +885,11 @@ async function saveQuiz(e) {
   const text = $('#qeText').value.trim();
   const choices = $$('.qe-c').map(i => i.value.trim());
   const answer = Number(($('input[name="qeAns"]:checked') || {}).value ?? 0);
+  const note = ($('#qeNote')?.value || '').trim();
   if (!text || choices.some(c => !c)) { toast('問題文と4つの選択肢をすべて入力してください', 'error'); return; }
   const id = editQuizId === 'new' ? 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) : editQuizId;
   try {
-    await be.set(`quizBank/${id}`, { text, choices, answer, used: !!D.quizBank?.[id]?.used });
+    await be.set(`quizBank/${id}`, { text, choices, answer, note: note || null, used: !!D.quizBank?.[id]?.used });
     editQuizId = null;
     document.activeElement?.blur?.();
     toast('問題を保存しました', 'ok');
