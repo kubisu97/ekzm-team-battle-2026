@@ -591,6 +591,26 @@ body.explaining { overflow: hidden; }
 .q-note b { display: inline-block; margin-right: 8px; padding: 0 8px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 12px; }
 .qb-note { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-60); }
 
+/* ---------- リハーサルモード ---------- */
+.rh-tag { display: inline-block; flex: none; font-family: var(--en); font-weight: 600; font-size: 10.5px; letter-spacing: .12em; color: #fff; background: var(--red); border-radius: 999px; padding: 2px 9px; line-height: 1.5; }
+.rh-bar { border: 2px solid var(--red); background: #fff7f7; }
+.rh-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rh-head b { font-size: 15px; }
+.rh-bar .fine { margin: 4px 0 8px; }
+.rh-btns { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; }
+.rh-btns .btn { min-height: 46px; }
+.rh-list { margin: 6px 0 12px; padding-left: 1.2em; display: grid; gap: 6px; font-size: 14px; }
+.rh-n { display: flex; align-items: center; gap: 8px; margin: 0; }
+/* 参加者の画面：ヘッダーの幅を使わないよう、ロゴの下に小さく重ねる */
+body.rehearsal .logo { position: relative; }
+body.rehearsal .logo::after { content: 'REHEARSAL'; position: absolute; left: 0; bottom: -13px; font-family: var(--en); font-weight: 600; font-size: 8.5px; letter-spacing: .1em; line-height: 1.45; color: #fff; background: var(--red); border-radius: 999px; padding: 0 6px; pointer-events: none; }
+.pv { position: fixed; inset: 0; z-index: 150; display: flex; flex-direction: column; background: var(--bg); }
+.pv[hidden] { display: none; }
+.pv-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; background: var(--white); border-bottom: 2px solid var(--red); }
+.pv-bar b { flex: 1; min-width: 0; font-size: 14px; }
+.pv iframe { flex: 1; width: 100%; border: 0; background: var(--bg); }
+body.pv-open { overflow: hidden; }
+
 /* ---------- スマホ向けの調整（最後に置いて上書き） ---------- */
 @media (max-width: 640px) {
   .status-card { position: static; }
