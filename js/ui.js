@@ -1,6 +1,6 @@
 // 参加者画面・管理画面で共通の表示部品
-import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=5';
-import { sfx, confetti, vibrate } from './fx.js?v=5';
+import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=6';
+import { sfx, confetti, vibrate } from './fx.js?v=6';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];

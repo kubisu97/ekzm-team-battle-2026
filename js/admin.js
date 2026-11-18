@@ -1,9 +1,10 @@
 // 管理者（司会者）画面
-import { createBackend, errMsg } from './db.js?v=5';
-import * as L from './logic.js?v=5';
-import { sfx, isMuted, setMuted } from './fx.js?v=5';
-import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=5';
-import qrcode from './vendor/qrcode.mjs?v=5';
+import { createBackend, errMsg } from './db.js?v=6';
+import * as L from './logic.js?v=6';
+import { sfx, isMuted, setMuted, wantAwake } from './fx.js?v=6';
+import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=6';
+import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=6';
+import qrcode from './vendor/qrcode.mjs?v=6';
 
 const root = $('#admin');
 let be = null;
@@ -17,6 +18,7 @@ let tab = 'control';
 try { tab = sessionStorage.getItem('ekzm-admin-tab') || 'control'; } catch { /* noop */ }
 const draft = { quizCount: L.QUIZ_DEFAULT_COUNT, quizPick: [], overrides: {}, forRound: null };
 let editRound = null;
+let rhDriver = null;
 let editQuizId = null;
 let renderQueued = false;
 let dirtyWhileFocused = false;
@@ -109,6 +111,9 @@ function startWatching() {
     }, e => toast('読み込みエラー：' + errMsg(e), 'error', 8000));
   }
   setInterval(() => { if (D.state?.phase === 'running') queueRender(); }, 500);
+  // リハーサル中は、この管理画面がダミー参加者を動かす
+  rhDriver = createDriver(be, D, { onError: e => console.warn('[rehearsal]', e) });
+  setInterval(() => rhDriver.tick(), 500);
   root.addEventListener('focusout', () => { if (dirtyWhileFocused) setTimeout(queueRender, 50); });
 }
 
@@ -174,10 +179,66 @@ function render() {
         ${st.explain?.key && L.EXPLAIN_PHASES.includes(st.phase) ? `<span class="chip ok">説明スライド表示中 ${(Number(st.explain.page) || 0) + 1}ページ目</span>` : ''}
       </div>
     </section>
+    ${rehearsalBar()}
     <nav class="tabs">${TABS.map(([k, l]) => `<button class="tab ${tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('')}</nav>
     <div id="tabBody">${tabBody()}</div>`;
   window.scrollTo(0, scroll);
   afterRender();
+  rhDriver?.tick();
+}
+
+// ---------- リハーサルモード ----------
+const dummyCount = () => Object.keys(D.members || {}).filter(isDummy).length;
+function rehearsalBar() {
+  if (!D.config?.rehearsal) return '';
+  wantAwake();
+  return `<section class="card rh-bar">
+    <div class="rh-head"><span class="rh-tag">REHEARSAL</span><b>リハーサル中（ダミー ${dummyCount()}人）</b></div>
+    <p class="fine">ダミーはこの画面が動かしています。リハーサル中はこの画面を開いたままにしてください。</p>
+    <div class="rh-btns">
+      <button class="btn btn-go" data-act="rhPreview">自分も参加者として見る</button>
+      <button class="btn btn-ghost" data-act="rhEnd">リハーサルを終わる</button>
+    </div>
+  </section>`;
+}
+function rehearsalCard() {
+  const on = !!D.config?.rehearsal;
+  const real = Object.keys(D.members || {}).filter(u => !isDummy(u)).length;
+  return `<section class="card rh-card">
+    ${head('Rehearsal', 'リハーサルモード', on ? '<span class="chip ok">実行中</span>' : '')}
+    <p class="step-desc">ダミー参加者を各チームに入れて、1人でも本番と同じ流れを試せます。ダミーは、代表者の立候補・準備OK・ゲームの記録を自動で送ります。</p>
+    <ul class="rh-list">
+      <li><b>自分の操作</b>：「自分も参加者として見る」を押すと、この画面の中に参加者の画面が開きます。1台で司会と参加者を行き来できます。</li>
+      <li><b>手伝ってくれる人</b>：参加用のQRから普通に参加してもらえばOK。ダミーと一緒に遊べます。</li>
+      <li>本物の参加者がいるチームは、その人の立候補を20秒待ってから、ダミーが代わりに立候補します。</li>
+    </ul>
+    ${on ? `<p>いまのダミー：<b>${dummyCount()}人</b>　本物の参加者：<b>${real}人</b></p>` : ''}
+    <div class="row gap">
+      <label class="lbl rh-n">1チームのダミー<select class="input input-sm" id="rhN">${[1, 2, 3, 4].map(n => `<option value="${n}" ${n === 3 ? 'selected' : ''}>${n}人</option>`).join('')}</select></label>
+      <button class="btn ${on ? 'btn-ghost' : 'btn-primary'}" data-act="rhStart">${on ? 'ダミーを追加する' : 'リハーサルを始める'}</button>
+    </div>
+    ${on ? '<button class="btn btn-danger-ghost" data-act="rhEnd">リハーサルを終わる（ダミーを消して得点をリセット）</button>' : ''}
+    <p class="fine">「リハーサルを終わる」で、ダミーとリハーサルの得点・記録を消して GAME 1 の待機に戻ります（本物の参加者の登録とクイズの問題は残ります）。本番の前には、念のため「全データ初期化」もしておくと安心です。</p>
+  </section>`;
+}
+
+/** 管理画面の中に参加者の画面を重ねて開く（ダミーを動かし続けるため、同じページ内で開く） */
+function togglePreview(show) {
+  let pv = $('#pv');
+  if (!pv) {
+    pv = document.createElement('div');
+    pv.id = 'pv';
+    pv.className = 'pv';
+    pv.hidden = true;
+    const src = `./?${be?.mock ? 'mock&' : ''}p=rh`;
+    pv.innerHTML = `<div class="pv-bar"><span class="rh-tag">REHEARSAL</span><b>参加者の画面</b><button class="btn btn-sm btn-go" id="pvBack">司会の画面に戻る</button></div>
+      <iframe id="pvFrame" title="参加者の画面（リハーサル）" src="${esc(src)}" allow="autoplay; screen-wake-lock; vibrate"></iframe>`;
+    document.body.appendChild(pv);
+    $('#pvBack', pv).addEventListener('click', () => togglePreview(false));
+  }
+  pv.hidden = !show;
+  document.body.classList.toggle('pv-open', !!show);
+  if (!show) queueRender();
 }
 
 function tabBody() {
@@ -534,7 +595,8 @@ function quizEditor(q) {
 function setupTab() {
   let svg = '';
   try { const qr = qrcode(0, 'M'); qr.addData(PLAYER_URL); qr.make(); svg = qr.createSvgTag({ cellSize: 8, margin: 3, scalable: true }); } catch (e) { svg = '<p>QR生成エラー</p>'; }
-  return `<section class="card center qr-card">
+  return `${rehearsalCard()}
+  <section class="card center qr-card">
     ${head('Entry QR', '参加用QRコード')}
     <div class="qr-box">${svg}</div>
     <p class="url">${esc(PLAYER_URL)}</p>
@@ -841,6 +903,24 @@ const ACTIONS = {
     draft.quizPick = [];
     toast(`Web制作クイズ${WEB_QUIZ.length}問を登録しました`, 'ok');
   },
+  async rhStart() {
+    const n = Number($('#rhN')?.value) || 3;
+    const wasOn = !!D.config?.rehearsal;
+    if (!wasOn && !confirm(`リハーサルを始めます。各チームにダミー参加者を${n}人ずつ入れます（空き枠の範囲で）。よろしいですか？`)) return;
+    const added = await addDummies(be, D, n);
+    toast(added ? `ダミーを${added}人追加しました` : 'ダミーを追加する空き枠がありません（定員を増やすか、人数を変えてください）', added ? 'ok' : 'warn', 5000);
+    if (added && !wasOn) { tab = 'control'; try { sessionStorage.setItem('ekzm-admin-tab', tab); } catch { /* noop */ } }
+    queueRender();
+  },
+  async rhEnd() {
+    if (!confirm('リハーサルを終わります。ダミーと、リハーサルの得点・記録を消して GAME 1 の待機に戻ります（本物の参加者の登録とクイズの問題は残ります）。よろしいですか？')) return;
+    togglePreview(false);
+    rhDriver?.stop();
+    draft.forRound = null; draft.quizPick = [];
+    await be.update(endRehearsalUpdate(D, initialState()));
+    toast('リハーサルを終了しました', 'ok');
+  },
+  rhPreview() { togglePreview(true); },
   async copyUrl() {
     try { await navigator.clipboard.writeText(PLAYER_URL); toast('URLをコピーしました', 'ok'); } catch { prompt('このURLをコピーしてください', PLAYER_URL); }
   },

@@ -1,14 +1,14 @@
 // 参加者・観戦画面
-import { createBackend, errMsg } from './db.js?v=5';
-import * as L from './logic.js?v=5';
-import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=5';
-import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js?v=5';
+import { createBackend, errMsg } from './db.js?v=6';
+import * as L from './logic.js?v=6';
+import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=6';
+import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js?v=6';
 import {
   $, esc, tvars, teamBadge, toast, perfAt, waitUntil, countdownOverlay,
   scoreboardHTML, mountRoundReveal, mountFinalReveal, rosterHTML,
   head, gameTag, cubeSVG, ICON, howtoHTML, pointsHTML, openHelp, progressHTML, nowHTML,
   explainSlideHTML, explainName,
-} from './ui.js?v=5';
+} from './ui.js?v=6';
 
 const params = new URLSearchParams(location.search);
 const slotParam = (params.get('p') || '').replace(/[^\w-]/g, '').slice(0, 12);
@@ -101,6 +101,7 @@ function setupHeader() {
 }
 
 function paintMe() {
+  document.body.classList.toggle('rehearsal', !!S.config?.rehearsal);
   const box = $('#meBox');
   const m = me();
   box.innerHTML = m ? `${teamBadge(m.team)}<span class="me-name">${esc(m.name)}</span>` : '';

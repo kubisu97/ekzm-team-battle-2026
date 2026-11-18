@@ -1,9 +1,9 @@
 // 通しテスト用：疑似参加者（ボット）とセキュリティ検査
 // 管理者でログイン済みのブラウザでのみ動作する（admin.html で先にログイン）
-import { createBackend, errMsg } from './db.js?v=5';
-import * as L from './logic.js?v=5';
-import { joinTeam, submitResult, markProg, sendLive } from './actions.js?v=5';
-import { $, esc } from './ui.js?v=5';
+import { createBackend, errMsg } from './db.js?v=6';
+import * as L from './logic.js?v=6';
+import { joinTeam, submitResult, markProg, sendLive } from './actions.js?v=6';
+import { $, esc } from './ui.js?v=6';
 
 const log = (msg, cls = '') => {
   const el = document.createElement('div');
