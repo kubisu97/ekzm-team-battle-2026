@@ -109,6 +109,7 @@ export const OVERVIEW = {
     '画面を閉じても、同じスマホ・同じブラウザで開き直せば続きから参加できます。',
     'LINEなどのアプリでQRを開いた場合は、最後までそのアプリで開いてください（別のブラウザだと別人扱いになります）。',
     '効果音が出ます。マナーモードを解除すると盛り上がります。',
+    '観戦中は、画面の下の「応援ボタン」で代表を応援できます。いちばん多く押した人には個人賞「応援団長賞」があります。',
   ],
 };
 
@@ -120,8 +121,9 @@ const plain = h => String(h).replace(/<[^>]+>/g, '');
  * 説明スライドの中身。key は 'opening'（大会全体）または各ゲームのキー。
  * 文字列のうち steps / list / games の各項目だけは固定文のHTML（<b>など）を含む。
  */
-export function explainSlides(key, { mult = 1, round = 1, phase = 'lobby' } = {}) {
+export function explainSlides(key, { mult = 1, round = 1, phase = 'lobby', award2 = DEFAULT_AWARD2 } = {}) {
   const m = Number(mult) || 1;
+  const a2 = AWARDS[AWARD2_OPTIONS.includes(award2) ? award2 : DEFAULT_AWARD2];
   if (key === 'opening') {
     return [
       {
@@ -147,6 +149,16 @@ export function explainSlides(key, { mult = 1, round = 1, phase = 'lobby' } = {}
         kicker: 'Points', title: '順位で得点が入ります', points: 1,
         note: '最終ゲームは得点2倍。同じ記録なら同じ順位・同じ得点です。フライング・記録なしは0点。',
         mc: ['得点は、1位100点、2位70点、3位50点、4位30点、5位10点。', '最終ゲームだけは得点2倍です！'],
+      },
+      {
+        kicker: 'Cheer & Awards', title: '観戦中は「応援ボタン」で応援！',
+        lead: 'ゲーム中は、観戦している人の画面の下に応援ボタンが出ます。どのチームの代表にも、何回でも送れます。',
+        list: [
+          `個人賞① <b>応援団長賞</b>：応援ボタンをいちばんたくさん押した人`,
+          `個人賞② <b>${a2.title}</b>：${a2.sub}`,
+        ],
+        note: '個人賞は、ゲームの記録から自動で決まります。総合結果のあとに発表します。',
+        mc: ['観戦している人は、ゲーム中に画面の下の応援ボタンで代表を応援できます。どのチームにも、何回でもOKです。', `応援ボタンをいちばんたくさん押した人には「応援団長賞」、そして「${a2.title}」もあります。どちらもゲームの記録で自動で決まります！`],
       },
       {
         kicker: 'Please', title: '楽しむためのおねがい',
@@ -181,17 +193,72 @@ export function explainSlides(key, { mult = 1, round = 1, phase = 'lobby' } = {}
   if (phase === 'ready') {
     slides.push({
       kicker: 'Next', title: '代表者は前へ！', lead: '代表者は、スマホの「準備OK」を押してください。ほかの人のスマホは観戦画面になります。', action: 'ok',
-      list: [`観戦のポイント：${g.spec}`],
+      list: [`観戦のポイント：${g.spec}`, 'ゲーム中は、画面の下の <b>応援ボタン</b> で代表を応援できます。'],
       mc: ['代表者のみなさん、前へどうぞ。スマホの「準備OK」を押してください。'],
     });
   } else {
     slides.push({
       kicker: 'Next', title: 'チームで代表者を1人決めよう', lead: '出る人が自分のスマホで「わたしが出る」を押してください。全チームそろったら代表者を発表します。', action: 'pick',
-      list: round > 1 ? ['まだ代表になっていない人から選ぶのがおすすめです。'] : [],
+      list: [...(round > 1 ? ['まだ代表になっていない人から選ぶのがおすすめです。'] : []), '観戦する人は、ゲーム中に <b>応援ボタン</b> で代表を応援しよう（応援団長賞のチャンス）。'],
       mc: ['それでは各チーム、代表者を1人決めてください！', '出る人は自分のスマホで「わたしが出る」を押してください。'],
     });
   }
   return slides;
+}
+
+// ---------- 応援ボタンと個人賞（すべてゲーム内の記録で自動的に決まる） ----------
+export const CHEER_MAX = 3000;       // 1ゲーム・1チームあたりの上限（ルールでも制限）
+export const CHEER_MIN_GAP = 70;     // これより速い連打は数えない（1秒に約14回まで）
+export const CHEER_SEND_MS = 500;    // 送信の間隔
+
+export const AWARDS = {
+  cheerGiven: { title: '応援団長賞', sub: '観戦中に応援ボタンをいちばんたくさん押した人' },
+  cheerGot: { title: '声援王', sub: '応援をいちばんたくさんもらった代表者' },
+  ten: { title: '神の体内時計賞', sub: '10秒ぴったりで、誤差がいちばん小さかった人' },
+  quiz: { title: 'クイズ王', sub: '早押しクイズで1位になった人' },
+  iai: { title: '居合の達人賞', sub: '居合斬りバトルで、反応がいちばん速かった人' },
+  tap: { title: '連打王', sub: '7秒連打バトルで、いちばん多く連打した人' },
+};
+/** 個人賞の2つ目に選べるもの（どれもゲームの記録で決まる） */
+export const AWARD2_OPTIONS = ['ten', 'cheerGot', 'iai', 'quiz', 'tap'];
+export const DEFAULT_AWARD2 = 'ten';
+export const award2Of = config => (AWARD2_OPTIONS.includes(config?.award2) ? config.award2 : DEFAULT_AWARD2);
+
+/**
+ * 個人賞を計算する。発表済みの結果（results）があるゲームだけを数える（やり直したゲームの応援は数えない）。
+ * 同数のときは全員を受賞者として返す。
+ */
+export function computeAwards({ results = {}, cheer = {}, members = {}, award2 = DEFAULT_AWARD2 } = {}) {
+  const runs = Object.values(results || {}).filter(r => r && r.runId);
+  const given = {};
+  const got = {};
+  const repInfo = {};
+  for (const r of runs) {
+    for (const row of Object.values(r.rows || {})) if (row?.uid) repInfo[row.uid] = { name: row.name, team: row.team };
+    const c = cheer?.[r.runId] || {};
+    for (const [u, teams] of Object.entries(c)) {
+      for (const [t, n] of Object.entries(teams || {})) {
+        const v = Math.max(0, Math.floor(Number(n) || 0));
+        if (!v) continue;
+        if (members?.[u]) given[u] = (given[u] || 0) + v;
+        const rep = r.rows?.[t]?.uid;
+        if (rep) got[rep] = (got[rep] || 0) + v;
+      }
+    }
+  }
+  const person = u => ({ uid: u, name: members?.[u]?.name ?? repInfo[u]?.name ?? '（退出）', team: members?.[u]?.team ?? repInfo[u]?.team ?? null });
+  const byCount = (key, map) => {
+    const max = Math.max(0, ...Object.values(map));
+    const winners = max ? Object.keys(map).filter(u => map[u] === max).map(u => ({ ...person(u), detail: `${max}回` })) : [];
+    return { key, ...AWARDS[key], winners };
+  };
+  const byGame = key => {
+    const r = runs.find(x => x.game === key);
+    const rows = r ? Object.values(r.rows || {}).filter(x => x && x.uid && Number(x.rank) === 1 && x.status === 'ok') : [];
+    return { key, ...AWARDS[key], winners: rows.map(x => ({ ...person(x.uid), name: x.name || person(x.uid).name, team: x.team, detail: x.detail || '' })) };
+  };
+  const a2 = AWARD2_OPTIONS.includes(award2) ? award2 : DEFAULT_AWARD2;
+  return [byCount('cheerGiven', given), a2 === 'cheerGot' ? byCount('cheerGot', got) : byGame(a2)];
 }
 
 export const PHASE_LABEL = {

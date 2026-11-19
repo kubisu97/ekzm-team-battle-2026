@@ -1,6 +1,6 @@
 // Firebase との接続をまとめたアダプター。
 // ?mock を付けて localhost で開いたときだけ、テスト用のモックサーバーにつなぐ（本番には影響しない）。
-import { firebaseConfig, ADMIN_UID, SDK_VERSION } from './firebase-config.js?v=6';
+import { firebaseConfig, ADMIN_UID, SDK_VERSION } from './firebase-config.js?v=7';
 
 export function isMockMode() {
   const p = new URLSearchParams(location.search);
@@ -23,7 +23,7 @@ function loadSdk() {
  */
 export async function createBackend(appName) {
   if (isMockMode()) {
-    const m = await import( './mockdb.js?v=6');
+    const m = await import( './mockdb.js?v=7');
     return m.createMockBackend(appName);
   }
   const [appM, authM, dbM] = await loadSdk();

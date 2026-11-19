@@ -1,14 +1,14 @@
 // 参加者・観戦画面
-import { createBackend, errMsg } from './db.js?v=6';
-import * as L from './logic.js?v=6';
-import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=6';
-import { sfx, vibrate, flash, wantAwake, isMuted, setMuted } from './fx.js?v=6';
+import { createBackend, errMsg } from './db.js?v=7';
+import * as L from './logic.js?v=7';
+import { joinTeam, submitResult, markProg, sendLive, startPresence } from './actions.js?v=7';
+import { sfx, vibrate, flash, wantAwake, isMuted, setMuted, confetti } from './fx.js?v=7';
 import {
   $, esc, tvars, teamBadge, toast, perfAt, waitUntil, countdownOverlay,
   scoreboardHTML, mountRoundReveal, mountFinalReveal, rosterHTML,
   head, gameTag, cubeSVG, ICON, howtoHTML, pointsHTML, openHelp, progressHTML, nowHTML,
   explainSlideHTML, explainName,
-} from './ui.js?v=6';
+} from './ui.js?v=7';
 
 const params = new URLSearchParams(location.search);
 const slotParam = (params.get('p') || '').replace(/[^\w-]/g, '').slice(0, 12);
@@ -133,6 +133,170 @@ function render() {
   else if (view.ctl?.update?.() === 'remount') mount(key);
   paintNow();
   paintExplain();
+  syncCheer();
+  paintAwards();
+}
+
+// ---------- 応援ボタン（ゲーム中・観戦している人だけ。どのチームの代表にも送れる） ----------
+const cheer = { run: null, mine: {}, sent: {}, totals: {}, loaded: false, last: 0, timer: 0, off: null, pops: 0 };
+const cheerActive = () => {
+  const st = S.state;
+  return !!(st && st.phase === 'running' && st.runId && me() && !isRep() && S.runLoaded && Object.keys(st.reps || {}).length);
+};
+function syncCheer() {
+  const st = S.state;
+  const run = st?.runId || null;
+  const active = cheerActive();
+  if (cheer.run && (cheer.run !== run || !active)) flushCheer();
+  if (cheer.run !== run) {
+    cheer.off?.(); cheer.off = null;
+    $('#cheerBar')?.remove();
+    Object.assign(cheer, { run, mine: {}, sent: {}, totals: {}, loaded: false });
+  }
+  if (active && !cheer.off) {
+    cheer.off = be.watch(`cheer/${run}`, v => {
+      cheer.totals = v || {};
+      if (!cheer.loaded) { // 再読み込みしても自分の回数を引き継ぐ
+        cheer.loaded = true;
+        const m = cheer.totals[uid] || {};
+        for (const t of L.TEAMS) { const n = Number(m[t]) || 0; cheer.mine[t] = Math.max(cheer.mine[t] || 0, n); cheer.sent[t] = Math.max(cheer.sent[t] || 0, n); }
+      }
+      paintCheer();
+    });
+  }
+  if (!active && cheer.off) { const off = cheer.off; cheer.off = null; setTimeout(off, 1500); }
+  paintCheer();
+}
+function paintCheer() {
+  const active = cheerActive();
+  let el = $('#cheerBar');
+  document.body.classList.toggle('cheering', active);
+  if (!active) { el?.remove(); return; }
+  const st = S.state;
+  const teams = L.TEAMS.filter(t => st.reps?.[t]);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cheerBar';
+    el.className = 'cheer';
+    el.innerHTML = `<div class="cheer-head"><b>代表に「がんばれ！」を送ろう</b><span>あなた <b id="cheerMine">0</b>回</span></div>
+      <div class="cheer-btns">${teams.map(t => `<button class="cheer-btn" data-t="${t}" style="${tvars(t)}" aria-label="${t}チームの代表を応援"><b>${t}</b><small>がんばれ</small><i id="ct-${t}">0</i></button>`).join('')}</div>`;
+    el.addEventListener('pointerdown', onCheer);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+    document.body.appendChild(el);
+  }
+  const totals = {};
+  for (const [u, m] of Object.entries(cheer.totals || {})) {
+    if (u === uid) continue;
+    for (const [t, n] of Object.entries(m || {})) totals[t] = (totals[t] || 0) + (Number(n) || 0);
+  }
+  for (const t of teams) { const i = $('#ct-' + t, el); if (i) i.textContent = (totals[t] || 0) + (cheer.mine[t] || 0); }
+  const mineEl = $('#cheerMine', el);
+  if (mineEl) mineEl.textContent = L.TEAMS.reduce((a, t) => a + (cheer.mine[t] || 0), 0);
+}
+function onCheer(e) {
+  const b = e.target.closest('.cheer-btn');
+  if (!b || !cheerActive()) return;
+  e.preventDefault();
+  const now = performance.now();
+  if (now - cheer.last < L.CHEER_MIN_GAP) return; // 速すぎる連打は数えない
+  cheer.last = now;
+  const t = b.dataset.t;
+  if ((cheer.mine[t] || 0) >= L.CHEER_MAX) return;
+  cheer.mine[t] = (cheer.mine[t] || 0) + 1;
+  popCheer(b);
+  paintCheer();
+  if (!cheer.timer) cheer.timer = setTimeout(flushCheer, L.CHEER_SEND_MS);
+}
+function flushCheer() {
+  clearTimeout(cheer.timer); cheer.timer = 0;
+  const run = cheer.run;
+  if (!run || !uid) return;
+  const up = {};
+  const snap = { ...cheer.mine };
+  for (const t of L.TEAMS) if ((snap[t] || 0) > (cheer.sent[t] || 0)) up[`cheer/${run}/${uid}/${t}`] = snap[t];
+  if (!Object.keys(up).length) return;
+  be.update(up).then(() => { for (const t of L.TEAMS) cheer.sent[t] = Math.max(cheer.sent[t] || 0, snap[t] || 0); }).catch(() => {});
+}
+function popCheer(btn) {
+  if (cheer.pops > 10) return;
+  cheer.pops++;
+  const r = btn.getBoundingClientRect();
+  const p = document.createElement('span');
+  p.className = 'cheer-pop';
+  p.textContent = '+1';
+  p.style.cssText = `left:${r.left + r.width / 2 + (Math.random() - 0.5) * 24}px;top:${r.top}px;color:${L.TEAM_INFO[btn.dataset.t]?.color || 'var(--navy)'}`;
+  document.body.appendChild(p);
+  setTimeout(() => { p.remove(); cheer.pops--; }, 650);
+}
+
+// ---------- 個人賞の発表（司会者が押すと全員のスマホに出る。受賞者はゲームの記録で自動的に決まる） ----------
+let awardsShown = null;
+let awardsClosed = null;
+let awardTimers = [];
+function paintAwards() {
+  const aw = S.state?.awards;
+  let el = $('#awards');
+  const show = !!(aw?.at && me() && S.state.phase === 'final' && awardsClosed !== aw.at);
+  if (!show) {
+    if (el) { awardTimers.forEach(clearTimeout); awardTimers = []; el.remove(); }
+    document.body.classList.remove('awarding');
+    awardsShown = null;
+    return;
+  }
+  if (el && awardsShown === aw.at) return;
+  awardsShown = aw.at;
+  awardTimers.forEach(clearTimeout); awardTimers = [];
+  el?.remove();
+  el = document.createElement('div');
+  el.id = 'awards';
+  el.className = 'awards';
+  el.setAttribute('role', 'dialog');
+  const list = L.arr(aw.list);
+  const winHTML = a => {
+    const ws = L.arr(a.winners);
+    if (!ws.length) return '<p class="aw-none">該当者なし</p>';
+    return `${ws.map(w => `<div class="aw-person ${w.uid === uid ? 'me' : ''}">${w.team ? teamBadge(w.team) : ''}<b>${esc(w.name)}</b><small>${esc(w.detail || '')}</small>${w.uid === uid ? '<em>あなたです！おめでとう！</em>' : ''}</div>`).join('')}${ws.length > 1 ? `<p class="aw-tie">同じ記録で${ws.length}人が受賞</p>` : ''}`;
+  };
+  el.innerHTML = `<div class="aw-in">
+      <p class="aw-kicker">Awards</p>
+      <h2 class="aw-title">個人賞の発表</h2>
+      <p class="aw-lead">受賞者は、ゲームの記録から自動で決まりました</p>
+      ${list.map((a, i) => `<section class="aw-card" id="aw${i}">
+        <p class="aw-no">個人賞 ${i + 1}</p>
+        <h3>${esc(a.title)}</h3>
+        <p class="aw-sub">${esc(a.sub)}</p>
+        <div class="aw-win" hidden>${winHTML(a)}</div>
+        <p class="aw-wait">発表まで、もう少し…</p>
+      </section>`).join('')}
+      <button class="btn btn-primary btn-block" id="awClose" hidden>閉じる</button>
+    </div>`;
+  document.body.appendChild(el);
+  document.body.classList.add('awarding');
+  $('#awClose', el).addEventListener('click', () => { awardsClosed = aw.at; document.body.classList.remove('awarding'); paintAwards(); });
+  const base = Number(aw.at) || be.serverNow();
+  const late = be.serverNow() - base > (list.length * 4500 + 3000);
+  list.forEach((a, i) => {
+    const t = base + 1800 + i * 4500 - be.serverNow();
+    const reveal = () => {
+      const card = $('#aw' + i, el);
+      if (!card) return;
+      $('.aw-win', card).hidden = false;
+      $('.aw-wait', card).hidden = true;
+      card.classList.add('open');
+      if (late) return;
+      try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* noop */ }
+      sfx.fanfare();
+      if (L.arr(a.winners).some(w => w.uid === uid)) { confetti(4000); vibrate([60, 40, 120]); }
+    };
+    if (late || t <= 0) reveal();
+    else {
+      if (t > 1500) awardTimers.push(setTimeout(() => sfx.drum(1.3), t - 1400));
+      awardTimers.push(setTimeout(reveal, t));
+    }
+  });
+  const tClose = base + 1800 + (list.length - 1) * 4500 + 1500 - be.serverNow();
+  const showClose = () => { const b = $('#awClose', el); if (b) b.hidden = false; };
+  late || tClose <= 0 ? showClose() : awardTimers.push(setTimeout(showClose, tClose));
 }
 
 // ---------- 説明スライド（司会者が管理画面で出す。全員のスマホに同じページが同時に出る） ----------
@@ -151,7 +315,7 @@ function paintExplain() {
     explainShown = null;
     return;
   }
-  const slides = L.explainSlides(ex.key, { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase });
+  const slides = L.explainSlides(ex.key, { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase, award2: L.award2Of(S.config) });
   if (!slides.length) return;
   const page = Math.min(Math.max(Number(ex.page) || 0, 0), slides.length - 1);
   const k = `${ex.key}|${page}|${slides.length}|${st.phase}|${isRep() ? 'rep' : ''}|${S.prog?.[uid]?.ok ? 'ok' : ''}|${myTeamPicked() ? 'p' : ''}`;
@@ -211,7 +375,7 @@ function paintNow() {
       : nowHTML({ tag: 'いまやること', title: '前に出て「準備OK」を押そう', sub: 'あなたがこのゲームの代表です', kind: 'act' });
     else h = nowHTML({ tag: '観戦', title: '今回は観戦。何もしなくてOK', sub: 'このまま画面を開いておくと試合が見られます', kind: 'wait' });
   } else if (kind === 'run' && !isRep()) {
-    h = nowHTML({ tag: '観戦中', title: '画面を見ながら応援しよう', sub: '記録と順位は結果発表で明かされます', kind: 'wait' });
+    h = nowHTML({ tag: '観戦中', title: '下の応援ボタンで「がんばれ！」を送ろう', sub: 'どのチームにも何回でもOK。いちばん押した人には個人賞', kind: 'act' });
   } else if (kind === 'judging') {
     h = nowHTML({ tag: '集計中', title: 'そのまま待とう', sub: 'まもなく全員の画面で結果発表が始まります', kind: 'wait' });
   } else if (kind === 'results') {

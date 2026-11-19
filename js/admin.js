@@ -1,10 +1,10 @@
 // 管理者（司会者）画面
-import { createBackend, errMsg } from './db.js?v=6';
-import * as L from './logic.js?v=6';
-import { sfx, isMuted, setMuted, wantAwake } from './fx.js?v=6';
-import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=6';
-import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=6';
-import qrcode from './vendor/qrcode.mjs?v=6';
+import { createBackend, errMsg } from './db.js?v=7';
+import * as L from './logic.js?v=7';
+import { sfx, isMuted, setMuted, wantAwake } from './fx.js?v=7';
+import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=7';
+import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=7';
+import qrcode from './vendor/qrcode.mjs?v=7';
 
 const root = $('#admin');
 let be = null;
@@ -268,7 +268,7 @@ function explainCard(st) {
   if (!L.EXPLAIN_PHASES.includes(st.phase)) return '';
   const ex = st.explain;
   const g = L.GAMES[st.game];
-  const opts = { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase };
+  const opts = { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase, award2: L.award2Of(D.config) };
   if (!ex?.key) {
     const first = st.round === 1 && st.phase === 'lobby';
     const nOpen = L.explainSlides('opening', opts).length;
@@ -496,12 +496,36 @@ function resultsPanel(st) {
 }
 
 function finalPanel() {
+  const st = D.state;
   const champs = L.overallRanking(L.computeTotals(D.results, D.adjust)).filter(x => x.rank === 1).map(x => x.team + 'チーム').join('・');
+  const aw = st.awards;
+  const awList = L.arr(aw?.list);
+  const winnersText = a => L.arr(a.winners).length ? L.arr(a.winners).map(w => `${w.team ? w.team + 'チーム ' : ''}${w.name}さん`).join('、') : '該当者なし';
   return `<section class="card">${head('Final', '総合結果発表中')}
-    <p class="step-desc">全員のスマホで総合順位を発表しています（約12秒）。おつかれさまでした。</p>
+    <p class="step-desc">全員のスマホで総合順位を発表しています（約12秒）。発表が終わったら、下の「個人賞を発表する」へ進みます。</p>
     ${mcHTML(['それでは総合結果の発表です！', `総合優勝は……${champs}です！ おめでとうございます！`])}
     <div class="row gap"><button class="btn btn-ghost" data-act="replay">発表演出をもう一度</button><button class="btn btn-ghost" data-act="backResults">第4ゲーム結果に戻す</button></div>
+  </section>
+  <section class="card award-ctl">
+    ${head('Awards', '個人賞の発表', aw ? '<span class="chip ok">発表済み</span>' : '')}
+    <p class="step-desc">受賞者はゲームの記録から自動で決まります（司会者は選びません）。押すと全員のスマホで、個人賞1→2の順に発表されます。</p>
+    ${aw ? `<ol class="aw-admin">${awList.map(a => `<li><b>${esc(a.title)}</b>：${esc(winnersText(a))}${L.arr(a.winners)[0]?.detail ? `（${esc(L.arr(a.winners)[0].detail)}）` : ''}</li>`).join('')}</ol>
+      ${mcHTML(['続いて、個人賞の発表です！', ...awList.map(a => `${a.title}は……${winnersText(a)}！おめでとうございます！`)], L.arr(awList).some(a => L.arr(a.winners).length > 1) ? '同じ記録の人が複数いるときは、景品はじゃんけんで決めてください。' : '')}
+      <button class="btn btn-ghost" data-act="announceAwards">もう一度発表する（最新の記録で計算し直す）</button>`
+    : `<p>個人賞①：<b>応援団長賞</b>（応援ボタンをいちばん押した人）<br>個人賞②：<b>${esc(L.AWARDS[L.award2Of(D.config)].title)}</b>（${esc(L.AWARDS[L.award2Of(D.config)].sub)}）</p>
+      <button class="btn btn-primary btn-xl" data-act="announceAwards">個人賞を発表する <span class="arr">→</span></button>`}
   </section>${scoreboardHTML(D.results, D.adjust, { title: '最終順位' })}`;
+}
+
+/** 個人賞の2つ目を選ぶ（受賞者ではなく、賞の種類を選ぶ。どれもゲームの記録で決まる） */
+function award2Card() {
+  const cur = L.award2Of(D.config);
+  return `<section class="card">
+    ${head('Awards', '個人賞（ゲームの記録で自動で決まる）')}
+    <p>個人賞①：<b>応援団長賞</b>　観戦中に応援ボタンをいちばんたくさん押した人</p>
+    <label class="lbl">個人賞②の種類<select class="input" id="award2Sel">${L.AWARD2_OPTIONS.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${esc(L.AWARDS[k].title)}：${esc(L.AWARDS[k].sub)}</option>`).join('')}</select></label>
+    <p class="fine">選べるのは賞の種類だけで、受賞者は記録で自動的に決まります。大会の説明スライドにも、ここで選んだ賞が出ます。「声援王」は、ゲーム時間の長い早押しクイズの代表が有利になりやすい点に注意してください。</p>
+  </section>`;
 }
 
 // ----- 参加者タブ -----
@@ -596,6 +620,7 @@ function setupTab() {
   let svg = '';
   try { const qr = qrcode(0, 'M'); qr.addData(PLAYER_URL); qr.make(); svg = qr.createSvgTag({ cellSize: 8, margin: 3, scalable: true }); } catch (e) { svg = '<p>QR生成エラー</p>'; }
   return `${rehearsalCard()}
+  ${award2Card()}
   <section class="card center qr-card">
     ${head('Entry QR', '参加用QRコード')}
     <div class="qr-box">${svg}</div>
@@ -641,6 +666,10 @@ function afterRender() {
   }));
   $$('.ovr').forEach(s => s.addEventListener('change', () => { draft.overrides[s.dataset.team] = s.value; s.blur(); queueRender(); }));
   $('#capSel')?.addEventListener('change', e => { setCap(Number(e.target.value)); e.target.blur(); });
+  $('#award2Sel')?.addEventListener('change', async e => {
+    const v = e.target.value; e.target.blur();
+    try { await be.set('config/award2', v); toast(`個人賞②を「${L.AWARDS[v].title}」にしました`, 'ok'); } catch (err) { toast(errMsg(err), 'error'); }
+  });
   $('#quizForm')?.addEventListener('submit', saveQuiz);
 }
 
@@ -671,7 +700,7 @@ const ACTIONS = {
     const st = D.state;
     const ex = st?.explain;
     if (!ex?.key) return;
-    const n = L.explainSlides(ex.key, { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase }).length;
+    const n = L.explainSlides(ex.key, { mult: Number(st.mult) || 1, round: st.round || 1, phase: st.phase, award2: L.award2Of(D.config) }).length;
     const page = Math.min(Math.max((Number(ex.page) || 0) + Number(b.dataset.d || 1), 0), n - 1);
     await be.update({ 'state/explain/page': page, 'state/updatedAt': be.TS });
   },
@@ -821,7 +850,7 @@ const ACTIONS = {
   },
   async final() {
     if (!confirm('総合結果を発表しますか？（全員のスマホで最終順位の発表演出が始まります）')) return;
-    await be.update({ 'state/phase': 'final', 'state/revealAt': be.serverNow() + 1500, 'state/updatedAt': be.TS });
+    await be.update({ 'state/phase': 'final', 'state/revealAt': be.serverNow() + 1500, 'state/awards': null, 'state/updatedAt': be.TS });
   },
   async backResults() { await be.update({ 'state/phase': 'results', 'state/revealAt': 0, 'state/updatedAt': be.TS }); },
   async redo() {
@@ -921,6 +950,13 @@ const ACTIONS = {
     toast('リハーサルを終了しました', 'ok');
   },
   rhPreview() { togglePreview(true); },
+  async announceAwards() {
+    const cheer = (await be.get('cheer')) || {};
+    const list = L.computeAwards({ results: D.results, cheer, members: D.members, award2: L.award2Of(D.config) });
+    if (!confirm(`個人賞（${list.map(a => a.title).join('・')}）を全員のスマホで発表します。受賞者はゲームの記録から自動で決まります。よろしいですか？`)) return;
+    await be.update({ 'state/awards': { at: be.serverNow() + 1200, list }, 'state/updatedAt': be.TS });
+    sfx.reveal();
+  },
   async copyUrl() {
     try { await navigator.clipboard.writeText(PLAYER_URL); toast('URLをコピーしました', 'ok'); } catch { prompt('このURLをコピーしてください', PLAYER_URL); }
   },
@@ -935,7 +971,7 @@ const ACTIONS = {
   async resetScores() {
     if (!confirm('得点・結果・出場履歴をすべて消して GAME 1 からやり直します。参加者の登録は残ります。よろしいですか？')) return;
     if (prompt('確認のため「リセット」と入力してください') !== 'リセット') return;
-    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, pick: null, state: initialState() };
+    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, cheer: null, adminOnly: null, pick: null, state: initialState() };
     for (const id of Object.keys(D.quizBank || {})) up[`quizBank/${id}/used`] = false;
     draft.forRound = null; draft.quizPick = [];
     await be.update(up);
@@ -944,7 +980,7 @@ const ACTIONS = {
   async resetAll() {
     if (!confirm('参加者も含めて全データを初期化します（クイズ問題は残ります）。参加者は登録からやり直しになります。よろしいですか？')) return;
     if (prompt('確認のため「初期化」と入力してください') !== '初期化') return;
-    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, pick: null, members: null, slots: null, online: null, state: initialState(), config: defaultConfig(Number(D.config?.teamCap) || 5) };
+    const up = { results: null, adjust: null, used: null, subs: null, prog: null, live: null, cheer: null, adminOnly: null, pick: null, members: null, slots: null, online: null, state: initialState(), config: { ...defaultConfig(Number(D.config?.teamCap) || 5), award2: D.config?.award2 || null } };
     for (const id of Object.keys(D.quizBank || {})) up[`quizBank/${id}/used`] = false;
     draft.forRound = null; draft.quizPick = [];
     await be.update(up);

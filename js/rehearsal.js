@@ -1,7 +1,7 @@
 // リハーサルモード：管理画面だけで「ダミー参加者」を動かし、1人でも本番と同じ流れを試せるようにする。
 // ダミーは参加者アカウントを作らず、管理者の権限で書き込む（uid が 'rh_' で始まるものがダミー）。
 // ダミーを動かすのは、リハーサルを開始した管理画面（開いている間だけ動く）。
-import * as L from './logic.js?v=6';
+import * as L from './logic.js?v=7';
 
 export const isDummy = uid => String(uid || '').startsWith('rh_');
 export const RH_PREFIX = 'rh_';
@@ -34,7 +34,7 @@ export async function addDummies(be, D, perTeam) {
 export function endRehearsalUpdate(D, initialState) {
   const up = {
     'config/rehearsal': null,
-    results: null, adjust: null, used: null, subs: null, prog: null, live: null, adminOnly: null, pick: null,
+    results: null, adjust: null, used: null, subs: null, prog: null, live: null, cheer: null, adminOnly: null, pick: null,
     state: initialState,
   };
   for (const [u, m] of Object.entries(D.members || {})) {
@@ -112,9 +112,28 @@ export function createDriver(be, D, { onError = () => {} } = {}) {
     }
   }
 
+  /** 観戦中のダミーが応援ボタンを押す（人によって熱量を変える） */
+  const cheerCount = {};
+  function cheerLoop(run, u, power) {
+    if (!stillRunning(run)) return;
+    const teams = Object.keys(D.state?.reps || {});
+    if (teams.length) {
+      const t = Math.random() < 0.6 ? (D.members?.[u]?.team && teams.includes(D.members[u].team) ? D.members[u].team : teams[0]) : teams[Math.floor(Math.random() * teams.length)];
+      const k = `${run}|${u}|${t}`;
+      cheerCount[k] = Math.min(L.CHEER_MAX, (cheerCount[k] || 0) + Math.floor(rand(0, power)));
+      if (cheerCount[k]) be.set(`cheer/${run}/${u}/${t}`, cheerCount[k]).catch(() => {});
+    }
+    later(rand(900, 1500), () => cheerLoop(run, u, power));
+  }
+
   function running(st) {
     const run = st.runId;
     const start = Number(st.startAt) || be.serverNow();
+    const repSet = new Set(Object.values(st.reps || {}));
+    for (const u of Object.keys(D.members || {})) {
+      if (!isDummy(u) || repSet.has(u)) continue;
+      once(`cheer|${run}|${u}`, rand(300, 1500), () => cheerLoop(run, u, rand(2, 14)));
+    }
     for (const u of Object.values(st.reps || {})) {
       if (!isDummy(u)) continue;
       if (st.game === 'quiz') {
