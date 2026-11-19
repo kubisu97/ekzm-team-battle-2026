@@ -125,3 +125,25 @@ test('在席表示', () => {
   assert.equal(evaluateRead(RULES, db, 'online', auth('u1')), false);
   ok(w(ADMIN, { online: null }), '管理者は消せる');
 });
+
+test('応援ボタン（観戦中の人だけ・増える方向だけ）', () => {
+  ok(w(ADMIN, { state: { round: 1, game: 'ten', phase: 'ready', mult: 1, runId: 'run9', reps: { A: 'u1', B: 'u3' }, repOf: { u1: 'A', u3: 'B' }, startAt: 0, updatedAt: TS } }), '代表者発表');
+  ng(w('u2', { 'cheer/run9/u2/A': 3 }), 'ゲーム前は応援できない');
+  ok(w(ADMIN, { 'state/phase': 'running', 'state/startAt': Date.now() }), 'スタート');
+  ok(w('u2', { 'cheer/run9/u2/A': 3, 'cheer/run9/u2/B': 1 }), '観戦中の人は応援できる（どのチームにも）');
+  ok(w('u2', { 'cheer/run9/u2/A': 10 }), '応援数は増やせる');
+  ng(w('u2', { 'cheer/run9/u2/A': 5 }), '応援数は減らせない');
+  ng(w('u2', { 'cheer/run9/u2/A': 5000 }), '上限あり');
+  ng(w('u2', { 'cheer/run9/u2/F': 1 }), 'F チームはない');
+  ng(w('u2', { 'cheer/run9/u2/A': 'x' }), '数値だけ');
+  ng(w('u1', { 'cheer/run9/u1/B': 1 }), '代表者本人は応援できない');
+  ng(w('u2', { 'cheer/run9/u4/A': 1 }), '他人の分は書けない');
+  ng(w('u2', { 'cheer/run8/u2/A': 1 }), '別ラウンドには書けない');
+  ng(w('nobody', { 'cheer/run9/nobody/A': 1 }), '未登録の人は応援できない');
+  ok(w(ADMIN, { 'state/phase': 'judging' }), '集計');
+  ok(w('u2', { 'cheer/run9/u2/A': 12 }), '集計に入った直後の最後の送信は受け付ける');
+  ok(w(ADMIN, { 'state/phase': 'results' }), '結果発表');
+  ng(w('u2', { 'cheer/run9/u2/A': 20 }), '結果発表後は応援できない');
+  assert.equal(evaluateRead(RULES, db, 'cheer/run9', auth('u3')), true, '応援数はみんな見られる');
+  ok(w(ADMIN, { cheer: null }), '管理者はリセットできる');
+});

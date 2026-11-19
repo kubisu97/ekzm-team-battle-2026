@@ -67,17 +67,17 @@ const explainText = p => p.evaluate(() => document.querySelector('#explain')?.in
   check((await get('state/explain'))?.key === 'opening', '管理：大会の説明を開始');
   for (const t of TEAMS) check((await explainText(P[t].p)).includes('チーム対抗ゲーム大会、はじめます'), `${t}: 1ページ目が全画面で出る`);
   check(!(await guest.$('#explain')), '未登録の人には説明を出さない（登録画面のまま）');
-  check((await admin.textContent('.explain-ctl')).includes('1 / 5'), '管理：プレビューとページ数');
+  check((await admin.textContent('.explain-ctl')).includes('1 / 6'), '管理：プレビューとページ数');
   await shot(P.A.p, 'X1-opening-1__iPhoneSE'); await shot(admin, 'X1-admin-opening-1');
-  for (let i = 2; i <= 5; i++) {
+  for (let i = 2; i <= 6; i++) {
     await admin.click('[data-act="explainMove"][data-d="1"]'); await sleep(450);
     const txt = await explainText(P.B.p);
-    check(txt.includes(`${i}\n / 5`) || txt.includes(`${i} / 5`), `B: ${i}ページ目に同時に進む`);
+    check(txt.includes(`${i}\n / 6`) || txt.includes(`${i} / 6`), `B: ${i}ページ目に同時に進む`);
     check((await overflow(P.A.p)).length === 0, `A(SE): ${i}ページ目ははみ出しなし`);
     await shot(P.A.p, `X1-opening-${i}__iPhoneSE`);
   }
   await admin.click('[data-act="explainMove"][data-d="-1"]'); await sleep(400);
-  check((await explainText(P.C.p)).includes('4 / 5') || (await explainText(P.C.p)).includes('4\n / 5'), 'C: 前へで戻る');
+  check((await explainText(P.C.p)).includes('5 / 6') || (await explainText(P.C.p)).includes('5\n / 6'), 'C: 前へで戻る');
   await admin.click('[data-act="explainMove"][data-d="1"]'); await sleep(300);
   await admin.click('[data-act="explainClose"]'); await sleep(600);
   check(!(await P.A.p.$('#explain')) && !(await get('state/explain')), '説明を終わると全員元の画面に戻る');

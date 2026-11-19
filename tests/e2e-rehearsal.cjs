@@ -120,7 +120,11 @@ const overflowX = p => p.evaluate(() => document.documentElement.scrollWidth > M
     await admin.click('[data-act="announce"]'); await sleep(3500);
     await admin.click('[data-act="start"]');
     const st = await get('state');
-    await sleep(4000 + (g === 'iai' ? Number(st.iaiDelay) + 1500 : 8000));
+    if (g === 'tap') { // お手伝いの人は観戦しながら応援ボタンを押す
+      await helper.waitForSelector('#cheerBar');
+      for (let i = 0; i < 12; i++) { await helper.click('.cheer-btn[data-t="B"]'); await sleep(90); }
+    }
+    await sleep(4000 + (g === 'iai' ? Number(st.iaiDelay) + 1500 : 8000) - (g === 'tap' ? 1300 : 0));
     if (g === 'tap') {
       const live = await get(`live/${st.runId}`);
       check(live && Object.keys(live).length === 5, '連打：ダミーのライブ連打数が流れる');
@@ -134,6 +138,23 @@ const overflowX = p => p.evaluate(() => document.documentElement.scrollWidth > M
   check((await get('state/phase')) === 'final', '総合結果まで進む');
   await sleep(9000);
   await shot(helper, 'R6-helper-final__iPhoneSE', true);
+  const cheerAll = await get('cheer');
+  check(cheerAll && Object.keys(cheerAll).length >= 3, '観戦中のダミーも応援ボタンを押している');
+  // 個人賞の発表（受賞者は記録から自動で決まる）
+  check((await admin.textContent('.award-ctl')).includes('応援団長賞'), '管理画面に個人賞の発表ボタン');
+  await admin.click('[data-act="announceAwards"]'); await sleep(800);
+  const aw = await get('state/awards');
+  const list = Object.values(aw?.list || {});
+  check(list.length === 2 && list[0].title === '応援団長賞' && list[1].title === '神の体内時計賞', '個人賞2つ（応援団長賞・神の体内時計賞）');
+  check(Object.values(list[0].winners || {}).length >= 1 && Object.values(list[1].winners || {}).length >= 1, '受賞者が自動で決まる');
+  await helper.waitForSelector('#awards');
+  check(true, 'お手伝いの人のスマホに個人賞の発表が出る');
+  await sleep(2600); await shot(helper, 'R7-awards-1__iPhoneSE');
+  await sleep(5000); await shot(helper, 'R7-awards-2__iPhoneSE');
+  await helper.waitForSelector('#awClose:not([hidden])', { timeout: 6000 });
+  await helper.click('#awClose'); await sleep(300);
+  check(!(await helper.$('#awards')), '閉じると総合結果の画面に戻る');
+  await shot(admin, 'R7-admin-awards', true);
 
   // ⑥ リハーサルを終わる
   await admin.click('[data-act="rhEnd"]'); await sleep(800);

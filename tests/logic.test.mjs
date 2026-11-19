@@ -80,3 +80,21 @@ test('名前の正規化', () => {
   assert.equal(L.cleanName('  <b>くりす</b>  '), 'bくりす/b');
   assert.equal(L.cleanName('a'.repeat(30)).length, 16);
 });
+
+test('個人賞：応援団長賞・声援王・記録の賞（発表済みのゲームだけ、同数は全員）', () => {
+  const results = {
+    r1: { runId: 'a', game: 'ten', rows: { A: { uid: 'u1', name: '一', team: 'A', rank: 1, status: 'ok', detail: '誤差 +0.012秒' }, B: { uid: 'u2', name: '二', team: 'B', rank: 2, status: 'ok' } } },
+    r2: { runId: 'b', game: 'quiz', rows: { A: { uid: 'u3', name: '三', team: 'A', rank: 1, status: 'ok' }, B: { uid: 'u4', name: '四', team: 'B', rank: 1, status: 'ok' } } },
+  };
+  const members = { u1: { name: '一', team: 'A' }, u2: { name: '二', team: 'B' }, u3: { name: '三', team: 'A' }, u4: { name: '四', team: 'B' }, u5: { name: '五', team: 'A' } };
+  const cheer = { a: { u5: { A: 30, B: 5 }, u3: { B: 12 } }, b: { u1: { A: 20 }, u5: { B: 1 } }, redone: { u2: { A: 999 } } };
+  const [given, ten] = L.computeAwards({ results, cheer, members, award2: 'ten' });
+  assert.deepEqual(given.winners.map(w => [w.name, w.detail]), [['五', '36回']]);
+  assert.deepEqual(ten.winners.map(w => w.name), ['一']);
+  const got = L.computeAwards({ results, cheer, members, award2: 'cheerGot' })[1];
+  assert.deepEqual(got.winners.map(w => [w.name, w.detail]), [['一', '30回']]);
+  assert.deepEqual(L.computeAwards({ results, cheer, members, award2: 'quiz' })[1].winners.map(w => w.name).sort(), ['三', '四']);
+  const tie = L.computeAwards({ results, cheer: { a: { u1: { A: 5 }, u2: { B: 5 } } }, members })[0];
+  assert.equal(tie.winners.length, 2, '同数は2人とも受賞');
+  assert.equal(L.computeAwards({ results: {}, cheer: {}, members })[0].winners.length, 0, '記録がなければ該当なし');
+});
