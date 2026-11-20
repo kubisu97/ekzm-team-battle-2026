@@ -1,6 +1,6 @@
 // 参加者画面・管理画面で共通の表示部品
-import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, orderRows, computeTotals, overallRanking } from './logic.js?v=7';
-import { sfx, confetti, vibrate } from './fx.js?v=7';
+import { TEAMS, TEAM_INFO, GAMES, OVERVIEW, POINTS, ROUND_GAMES, DEFAULT_MULT, orderRows, computeTotals, overallRanking } from './logic.js?v=10';
+import { sfx, confetti, vibrate } from './fx.js?v=10';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -44,7 +44,7 @@ export function pointsHTML(mult = 1) {
 /** 説明スライド1枚分（参加者の全画面表示と、管理画面のプレビューで共通） */
 export function explainSlideHTML(sl) {
   if (!sl) return '';
-  const games = () => `<ol class="xs-games">${['ten', 'quiz', 'iai', 'tap'].map(k => `<li><span class="gnum">GAME ${GAMES[k].num}</span><span class="xg-t"><b>${esc(GAMES[k].title)}</b>${k === 'tap' ? '<em class="x2">得点2倍</em>' : ''}<small>${esc(GAMES[k].lead)}</small></span></li>`).join('')}</ol>`;
+  const games = () => `<ol class="xs-games">${ROUND_GAMES.map((k, i) => `<li><span class="gnum">GAME ${GAMES[k].num}</span><span class="xg-t"><b>${esc(GAMES[k].title)}</b>${DEFAULT_MULT[i] > 1 ? `<em class="x2">得点${DEFAULT_MULT[i]}倍</em>` : ''}<small>${esc(GAMES[k].lead)}</small></span></li>`).join('')}</ol>`;
   return `<div class="xs">
     <p class="xs-kicker">${esc(sl.kicker)}</p>
     ${sl.hero ? `<p class="xs-hero">GAME <b>${esc(sl.hero)}</b></p>` : ''}
@@ -188,6 +188,18 @@ export function scoreboardHTML(results, adjust, { me = null, title = '総合ラ�
   </section>`;
 }
 
+/** 5チームを1行で見せる小さな一覧（cells: [{t, top, sub, cls}]） */
+export function teamStripHTML(cells, { me = null, title = '' } = {}) {
+  return `<div class="tstrip">${title ? `<p class="tstrip-h">${title}</p>` : ''}<ol>${cells.map(c => `<li class="${c.cls || ''} ${me === c.t ? 'mine' : ''}" style="${tvars(c.t)}">${teamBadge(c.t)}<b>${c.top ?? ''}</b><small>${c.sub ?? ''}</small></li>`).join('')}</ol></div>`;
+}
+
+/** 総合順位を1行で（順位・チーム・合計点） */
+export function rankStripHTML(results, adjust, { me = null, title = '総合順位' } = {}) {
+  const ranking = overallRanking(computeTotals(results, adjust));
+  const played = Object.keys(results || {}).length;
+  return teamStripHTML(ranking.map(r => ({ t: r.team, top: `${r.rank}位`, sub: `${r.pts}pt`, cls: r.rank === 1 ? 'top' : '' })), { me, title: `${title}<span>${played}/4 ゲーム終了</span>` });
+}
+
 /** ラウンド結果の発表演出（全端末で revealAt に合わせて同時に進行） */
 export function mountRoundReveal(host, { be, result, round, results, adjust, revealAt, me = null }) {
   const game = GAMES[result.game] || {};
@@ -196,7 +208,7 @@ export function mountRoundReveal(host, { be, result, round, results, adjust, rev
   host.innerHTML = `<section class="card reveal-card">
       <div class="reveal-title"><span class="label">Result</span>
       <h2>${gameTag(result.game)}${esc(game.title || '')} 結果発表${Number(result.mult) > 1 ? '<span class="x2">得点2倍</span>' : ''}</h2>
-      <p class="fine" style="margin-top:-6px">5位から順に発表します。記録の横の「+」がこのゲームで入った得点です。</p></div>
+      <p class="fine">5位から順に発表。「+」はこのゲームの得点です。</p></div>
       <ol class="reveal-list">${seq.map(r => `
         <li class="reveal-item ${r.rank === 1 ? 'first' : ''} ${me === r.team ? 'me' : ''}" style="${tvars(r.team)}">
           <span class="rk">${r.rank ? `${r.rank}<small>位</small>` : '<small>失格</small>'}</span>
@@ -214,8 +226,7 @@ export function mountRoundReveal(host, { be, result, round, results, adjust, rev
   const now = performance.now();
   const showAll = () => {
     items.forEach(i => i.classList.add('shown'));
-    after.innerHTML = scoreboardHTML(results, adjust, { me, title: `第${round}ゲーム終了時点の順位` }) +
-      (round < 4 ? `<p class="fine center">次のゲームの準備ができるまで、少しお待ちください。代表者はまたチームで決めます。</p>` : `<p class="fine center">このあと、司会者が総合結果を発表します。</p>`);
+    after.innerHTML = `<section class="card slim">${rankStripHTML(results, adjust, { me, title: `第${round}ゲーム終了時点の総合順位` })}</section>`;
   };
   if (now > doneAt + 1500) { showAll(); return () => {}; }
   if (now < start + LEAD) sfx.drum(Math.min(2, (start + LEAD - now) / 1000));
@@ -239,7 +250,7 @@ export function mountFinalReveal(host, { be, results, adjust, revealAt, members 
   const champs = ranking.filter(r => r.rank === 1);
   const memberNames = t => { const ns = Object.values(members || {}).filter(m => m.team === t).map(m => m.name); return ns.map((n, i) => `<span class="seg">${esc(n)}${i < ns.length - 1 ? '・' : ''}</span>`).join(''); };
   host.innerHTML = `<section class="card final-card">
-      <div class="reveal-title"><span class="label">Final Result</span><h2>総合結果発表</h2><p class="fine" style="margin-top:-6px">4ゲームの合計点で順位が決まりました。5位から順に発表します。</p></div>
+      <div class="reveal-title"><span class="label">Final Result</span><h2>総合結果発表</h2><p class="fine">4ゲームの合計点で、5位から順に発表します。</p></div>
       <ol class="reveal-list final">${seq.map(r => `
         <li class="reveal-item ${r.rank === 1 ? 'first' : ''} ${me === r.team ? 'me' : ''}" style="${tvars(r.team)}">
           <span class="rk">${r.rank}<small>位</small></span>${teamBadge(r.team)}

@@ -12,40 +12,42 @@ export const TEAM_INFO = {
 };
 
 export const POINTS = [100, 70, 50, 30, 10];
-export const ROUND_GAMES = ['ten', 'quiz', 'iai', 'tap'];
+export const ROUND_GAMES = ['ten', 'quiz', 'touch', 'tap'];
 export const DEFAULT_MULT = [1, 1, 1, 2];
 export const TOTAL_ROUNDS = 4;
 
 // ゲームごとの定数
-export const TEN_TARGET = 10000;     // 目標 10 秒
+export const TEN_TARGET = 20000;     // 目標 20 秒
 export const TEN_VISIBLE = 3000;     // 最初の 3 秒だけタイマーを見せる
-export const TEN_LIMIT = 30000;      // 30 秒で自動停止
+export const TEN_LIMIT = 40000;      // 40 秒で自動停止
 export const IAI_MIN_DELAY = 2500;   // 「構え」から「斬れ」までの最短待機
 export const IAI_MAX_DELAY = 6500;   // 最長待機
 export const IAI_FOUL_MS = 100;      // 100ms 未満の反応は予測押し＝フライング扱い
 export const IAI_LIMIT = 3000;       // 「斬れ」から 3 秒で時間切れ
-export const TAP_MS = 7000;          // 連打時間
-export const TAP_LIVE_UNTIL = 5000;  // 観戦画面の連打数は 5 秒まで公開（最後 2 秒は伏せる）
-export const TAP_MAX = 250;          // 7 秒で物理的にありえない回数は弾く
+export const TAP_MS = 15000;         // 連打時間
+export const TAP_LIVE_UNTIL = 13000; // 観戦画面の連打数は 13 秒まで公開（最後 2 秒は伏せる）
+export const TAP_MAX = 400;          // 15 秒で物理的にありえない回数は弾く（ルールでも制限）
+export const TOUCH_N = 16;           // 数字タッチ：1〜16
+export const TOUCH_LIMIT = 60000;    // 60 秒で時間切れ
 export const QUIZ_LIMIT = 15000;     // 1 問の制限時間
-export const QUIZ_DEFAULT_COUNT = 3;
-export const QUIZ_MAX_COUNT = 5;
+export const QUIZ_DEFAULT_COUNT = 7;
+export const QUIZ_MAX_COUNT = 10;
 export const COUNTDOWN_MS = 4000;    // 3,2,1,START!
 
 export const GAMES = {
   ten: {
-    key: 'ten', num: '01', title: '10秒ぴったり', en: 'Just 10 Seconds', icon: '',
-    rule: 'スタートと同時にタイマーが動き出す。最初の3秒だけ数字が見えて、あとは体内時計が頼り。ちょうど10秒だと思った瞬間にSTOPをタップ。10秒との誤差が小さい順に順位が決まる。',
-    lead: '体内時計で、ちょうど10秒を当てるゲーム',
+    key: 'ten', num: '01', title: '20秒ぴったり', en: 'Just 20 Seconds', icon: '',
+    rule: 'スタートと同時にタイマーが動き出す。最初の3秒だけ数字が見えて、あとは体内時計が頼り。ちょうど20秒だと思った瞬間にSTOPをタップ。20秒との誤差が小さい順に順位が決まる。',
+    lead: '体内時計で、ちょうど20秒を当てるゲーム',
     howto: [
       '司会者の合図で、代表者のスマホに <b>3・2・1</b> のカウントダウンが出ます。',
       'スタートと同時にタイマーが動き出します。数字が見えるのは <b>最初の3秒だけ</b>。そのあとは「?.??」に変わります。',
-      '心の中で数え続けて、<b>ちょうど10秒だと思った瞬間に「STOP」</b>をタップします。',
+      '心の中で数え続けて、<b>ちょうど20秒だと思った瞬間に「STOP」</b>をタップします。',
     ],
-    judge: '10秒との誤差（ズレ）が小さい順。早すぎても遅すぎても同じ扱いです。',
-    tips: '時計やほかの人のスマホを見るのはナシ。30秒たつと自動で止まります。',
+    judge: '20秒との誤差（ズレ）が小さい順。早すぎても遅すぎても同じ扱いです。',
+    tips: '時計やほかの人のスマホを見るのはナシ。40秒たつと自動で止まります。',
     spec: '観戦画面にもタイマーが出ます（3秒以降は非表示）。誰がSTOPしたかは分かりますが、記録は結果発表まで秘密です。',
-    mc: ['続いてのゲームは「10秒ぴったり」！', 'タイマーが見えるのは最初の3秒だけ。あとは体内時計で、ちょうど10秒だと思ったらSTOPです。'],
+    mc: ['続いてのゲームは「20秒ぴったり」！', 'タイマーが見えるのは最初の3秒だけ。あとは体内時計で、ちょうど20秒だと思ったらSTOPです。'],
     mcGo: 'それではいきます。3・2・1、スタート！',
   },
   quiz: {
@@ -78,19 +80,34 @@ export const GAMES = {
     mc: ['続いてのゲームは「居合斬りバトル」！', '「構え…」のあと「斬れ！」が出た瞬間に画面をタップ。先に触るとフライングで失格です。'],
     mcGo: '静かに……構えてください。',
   },
+  touch: {
+    key: 'touch', num: '03', title: '数字タッチ', en: 'Number Touch', icon: '',
+    rule: 'バラバラに並んだ1〜16の数字を、1から順番にタップ。16まで押し終わるまでの時間が短い順に順位決定。全員同じ並び。60秒で時間切れ（それまでに押せた数で順位）。',
+    lead: '1から16まで、順番にすばやくタップするゲーム',
+    howto: [
+      'スタートすると、画面に <b>1〜16の数字</b> がバラバラに並びます（全員同じ並び）。',
+      '<b>1から順番に</b> タップ。正しい数字を押すと色が変わって、次の数字へ進みます。',
+      '<b>16まで押したらゴール</b>。かかった時間で勝負です。',
+    ],
+    judge: '16まで押し終わるまでの時間が短い順。60秒で終わらなかった人は、押せた数が多い順（ゴールした人より下）。',
+    tips: '違う数字を押しても失格にはなりません。落ち着いて次の数字を探しましょう。',
+    spec: '観戦画面に、各チームがいくつまで進んだかがリアルタイムで出ます。タイムは結果発表まで秘密です。',
+    mc: ['続いてのゲームは「数字タッチ」！', 'バラバラに並んだ1から16の数字を、1から順番にタップ。16まで早く押し終わった人の勝ちです！'],
+    mcGo: '準備はいいですか？ 3・2・1、スタート！',
+  },
   tap: {
-    key: 'tap', num: '04', title: '7秒連打バトル', en: '7 Sec Rapid Tap', icon: '',
-    rule: '7秒間でタップした回数を競う。回数が多い順に順位決定。観戦画面には連打数がリアルタイムで流れるけど、ラスト2秒は伏せ字。最終ゲームは得点2倍！',
-    lead: '7秒間、とにかく連打するゲーム',
+    key: 'tap', num: '04', title: '15秒連打バトル', en: '15 Sec Rapid Tap', icon: '',
+    rule: '15秒間でタップした回数を競う。回数が多い順に順位決定。観戦画面には連打数がリアルタイムで流れるけど、ラスト2秒は伏せ字。最終ゲームは得点2倍！',
+    lead: '15秒間、とにかく連打するゲーム',
     howto: [
       'カウントダウンのあと、画面いっぱいの <b>「TAP!」ボタン</b> が押せるようになります。',
-      '<b>7秒間、とにかく連打</b>。指を何本使ってもかまいません。',
-      '7秒たつと自動で終わります。回数は自分の画面に出ます。',
+      '<b>15秒間、とにかく連打</b>。指を何本使ってもかまいません。',
+      '15秒たつと自動で終わります。回数は自分の画面に出ます。',
     ],
     judge: 'タップした回数が多い順。',
     tips: '最終ゲームは得点2倍。逆転のチャンスです。',
     spec: '観戦画面に、各チームの連打数がリアルタイムで流れます。ただしラスト2秒は「？？？」で隠れます。',
-    mc: ['いよいよ最終ゲーム「7秒連打バトル」！', '7秒間でタップした回数を競います。このゲームは得点2倍、逆転のチャンスです！'],
+    mc: ['いよいよ最終ゲーム「15秒連打バトル」！', '15秒間でタップした回数を競います。このゲームは得点2倍、逆転のチャンスです！'],
     mcGo: 'いきます。3・2・1、連打！',
   },
 };
@@ -109,7 +126,7 @@ export const OVERVIEW = {
     '画面を閉じても、同じスマホ・同じブラウザで開き直せば続きから参加できます。',
     'LINEなどのアプリでQRを開いた場合は、最後までそのアプリで開いてください（別のブラウザだと別人扱いになります）。',
     '効果音が出ます。マナーモードを解除すると盛り上がります。',
-    '観戦中は、画面の下の「応援ボタン」で代表を応援できます。いちばん多く押した人には個人賞「応援団長賞」があります。',
+    '観戦中は、画面の下の「応援ボタン」で代表を応援できます。たくさん押すと……いいことがあるかも？',
   ],
 };
 
@@ -151,14 +168,14 @@ export function explainSlides(key, { mult = 1, round = 1, phase = 'lobby', award
         mc: ['得点は、1位100点、2位70点、3位50点、4位30点、5位10点。', '最終ゲームだけは得点2倍です！'],
       },
       {
-        kicker: 'Cheer & Awards', title: '観戦中は「応援ボタン」で応援！',
-        lead: 'ゲーム中は、観戦している人の画面の下に応援ボタンが出ます。どのチームの代表にも、何回でも送れます。',
+        kicker: 'Cheer', title: '観戦中は「応援ボタン」で応援！',
+        lead: 'ゲーム中は、観戦している人の画面の下に応援ボタンが出ます。',
         list: [
-          `個人賞① <b>応援団長賞</b>：応援ボタンをいちばんたくさん押した人`,
-          `個人賞② <b>${a2.title}</b>：${a2.sub}`,
+          'どのチームの代表にも、<b>何回でも</b>送れます',
+          '応援の数は、<b>みんなの画面</b>に出ます',
         ],
-        note: '個人賞は、ゲームの記録から自動で決まります。総合結果のあとに発表します。',
-        mc: ['観戦している人は、ゲーム中に画面の下の応援ボタンで代表を応援できます。どのチームにも、何回でもOKです。', `応援ボタンをいちばんたくさん押した人には「応援団長賞」、そして「${a2.title}」もあります。どちらもゲームの記録で自動で決まります！`],
+        note: 'たくさん押すと……最後に、いいことがあるかも？',
+        mc: ['観戦している人は、ゲーム中に画面の下の応援ボタンで代表を応援してください。どのチームにも、何回でもOKです。', 'たくさん押すと……最後に、いいことがあるかもしれません！'],
       },
       {
         kicker: 'Please', title: '楽しむためのおねがい',
@@ -199,7 +216,7 @@ export function explainSlides(key, { mult = 1, round = 1, phase = 'lobby', award
   } else {
     slides.push({
       kicker: 'Next', title: 'チームで代表者を1人決めよう', lead: '出る人が自分のスマホで「わたしが出る」を押してください。全チームそろったら代表者を発表します。', action: 'pick',
-      list: [...(round > 1 ? ['まだ代表になっていない人から選ぶのがおすすめです。'] : []), '観戦する人は、ゲーム中に <b>応援ボタン</b> で代表を応援しよう（応援団長賞のチャンス）。'],
+      list: [...(round > 1 ? ['まだ代表になっていない人から選ぶのがおすすめです。'] : []), '観戦する人は、ゲーム中に <b>応援ボタン</b> で代表を応援しよう。'],
       mc: ['それでは各チーム、代表者を1人決めてください！', '出る人は自分のスマホで「わたしが出る」を押してください。'],
     });
   }
@@ -214,13 +231,14 @@ export const CHEER_SEND_MS = 500;    // 送信の間隔
 export const AWARDS = {
   cheerGiven: { title: '応援団長賞', sub: '観戦中に応援ボタンをいちばんたくさん押した人' },
   cheerGot: { title: '声援王', sub: '応援をいちばんたくさんもらった代表者' },
-  ten: { title: '神の体内時計賞', sub: '10秒ぴったりで、誤差がいちばん小さかった人' },
+  ten: { title: '神の体内時計賞', sub: '20秒ぴったりで、誤差がいちばん小さかった人' },
+  touch: { title: '指先の達人賞', sub: '数字タッチで、いちばん速くゴールした人' },
   quiz: { title: 'クイズ王', sub: '早押しクイズで1位になった人' },
   iai: { title: '居合の達人賞', sub: '居合斬りバトルで、反応がいちばん速かった人' },
-  tap: { title: '連打王', sub: '7秒連打バトルで、いちばん多く連打した人' },
+  tap: { title: '連打王', sub: '15秒連打バトルで、いちばん多く連打した人' },
 };
 /** 個人賞の2つ目に選べるもの（どれもゲームの記録で決まる） */
-export const AWARD2_OPTIONS = ['ten', 'cheerGot', 'iai', 'quiz', 'tap'];
+export const AWARD2_OPTIONS = ['ten', 'touch', 'quiz', 'tap', 'cheerGot'];
 export const DEFAULT_AWARD2 = 'ten';
 export const award2Of = config => (AWARD2_OPTIONS.includes(config?.award2) ? config.award2 : DEFAULT_AWARD2);
 
@@ -287,7 +305,7 @@ const secs = (ms, d = 3) => (ms / 1000).toFixed(d);
 
 /**
  * 提出データから各チームの成績行を作る（順位付け前）。
- * @param game  'ten'|'quiz'|'iai'|'tap'
+ * @param game  'ten'|'quiz'|'touch'|'tap'（'iai' は旧ゲーム）
  * @param reps  {A: uid, ...}
  * @param members {uid: {name, team}}
  * @param subs  {uid: {res: {v, f}, q0: {v, c}, ...}}
@@ -331,6 +349,11 @@ export function buildRows(game, reps, members, subs, opts = {}) {
           row.metric = v;
           row.detail = v >= IAI_LIMIT ? '時間切れ（3秒）' : `反応 ${secs(v)}秒`;
         }
+      } else if (game === 'touch') {
+        const n = Math.max(0, Math.min(TOUCH_N, Math.round(Number(s.res.n) || 0)));
+        row.status = 'ok';
+        if (n >= TOUCH_N) { row.metric = v; row.detail = `タイム ${secs(v, 2)}秒`; }
+        else { row.metric = TOUCH_LIMIT * 2 + (TOUCH_N - n) * 1000; row.detail = `時間切れ（${n}/${TOUCH_N}まで）`; }
       } else if (game === 'tap') {
         const n = Math.min(TAP_MAX, Math.max(0, v));
         row.status = 'ok';
@@ -405,3 +428,14 @@ export function arr(x) {
 }
 
 export function randomInt(min, max) { return Math.floor(min + Math.random() * (max - min + 1)); }
+
+/** 数字タッチの並び（runId から全員同じ並びを作る） */
+export function touchBoard(seedText) {
+  let h = 2166136261;
+  for (const ch of String(seedText || 'seed')) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  let x = h || 1;
+  const rnd = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+  const a = Array.from({ length: TOUCH_N }, (_, i) => i + 1);
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}

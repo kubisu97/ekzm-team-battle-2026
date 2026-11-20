@@ -1,9 +1,9 @@
 // 通しテスト用：疑似参加者（ボット）とセキュリティ検査
 // 管理者でログイン済みのブラウザでのみ動作する（admin.html で先にログイン）
-import { createBackend, errMsg } from './db.js?v=7';
-import * as L from './logic.js?v=7';
-import { joinTeam, submitResult, markProg, sendLive } from './actions.js?v=7';
-import { $, esc } from './ui.js?v=7';
+import { createBackend, errMsg } from './db.js?v=10';
+import * as L from './logic.js?v=10';
+import { joinTeam, submitResult, markProg, sendLive } from './actions.js?v=10';
+import { $, esc } from './ui.js?v=10';
 
 const log = (msg, cls = '') => {
   const el = document.createElement('div');
@@ -89,8 +89,12 @@ class Bot {
     const start = Number(st.startAt);
     this.at(start, () => markProg(this.be, run, 'go'));
     if (st.game === 'ten') {
-      const v = 10000 + Math.round((Math.random() - 0.5) * 1800);
+      const v = L.TEN_TARGET + Math.round((Math.random() - 0.5) * 3600);
       this.at(start + v, () => this.submit(run, 'res', { v }));
+    } else if (st.game === 'touch') {
+      const per = 900 + Math.random() * 1300;
+      for (let n = 1; n <= L.TOUCH_N; n++) this.at(start + n * per, () => sendLive(this.be, run, n));
+      this.at(start + L.TOUCH_N * per + 150, () => this.submit(run, 'res', { v: Math.round(L.TOUCH_N * per), n: L.TOUCH_N }));
     } else if (st.game === 'iai') {
       const go = start + Number(st.iaiDelay);
       if (Math.random() < 0.1) this.at(go - 400, () => this.submit(run, 'res', { v: 0, f: true }));
@@ -189,7 +193,7 @@ async function duplicateTest() {
   // 代表者になっているボットが、同じラウンドで2回目の送信をして拒否されるかを確認
   const st = await adminBe.get('state');
   const rep = bots.find(b => st?.repOf?.[b.uid]);
-  if (!rep || st.phase !== 'running' || st.game === 'quiz') { log('二重送信テストは、ボットが代表の「10秒/居合/連打」の対戦中に実行してください', 'ng'); return; }
+  if (!rep || st.phase !== 'running' || st.game === 'quiz') { log('二重送信テストは、ボットが代表の「20秒/数字タッチ/連打」の対戦中に実行してください', 'ng'); return; }
   const has = await rep.be.get(`subs/${st.runId}/${rep.uid}/res`);
   if (!has) { log('まだ1回目の送信が済んでいません。少し待ってから実行してください', 'ng'); return; }
   $('#secRows').innerHTML = '';

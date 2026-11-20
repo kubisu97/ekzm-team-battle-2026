@@ -1,10 +1,10 @@
 // 管理者（司会者）画面
-import { createBackend, errMsg } from './db.js?v=7';
-import * as L from './logic.js?v=7';
-import { sfx, isMuted, setMuted, wantAwake } from './fx.js?v=7';
-import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=8';
-import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=7';
-import qrcode from './vendor/qrcode.mjs?v=7';
+import { createBackend, errMsg } from './db.js?v=10';
+import * as L from './logic.js?v=10';
+import { sfx, isMuted, setMuted, wantAwake } from './fx.js?v=10';
+import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=10';
+import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=10';
+import qrcode from './vendor/qrcode.mjs?v=10';
 
 const root = $('#admin');
 let be = null;
@@ -426,24 +426,62 @@ function runningPanel(st) {
     allDone = !q.open && next >= total;
   } else allDone = repIds.every(u => D.prog?.[u]?.res);
   const statusFn = u => {
-    const p = D.prog?.[u] || {};
-    if (st.game === 'quiz') {
-      const n = Number(q.total) || 0;
-      return Array.from({ length: n }, (_, i) => `<span class="qdot ${p['q' + i] ? 'on' : p['g' + i] ? 'seen' : ''}">${i + 1}</span>`).join('');
-    }
-    const live = st.game === 'tap' && D.live?.[u] != null ? `<small class="muted">${D.live[u]}回</small> ` : '';
-    return live + (p.res ? '<span class="ok">完了</span>' : p.go ? '<span class="st-live">プレイ中</span>' : '<span class="muted">待機</span>');
+    return liveStatus(st, u);
   };
   const counting = be.serverNow() < Number(st.startAt);
+  const elapsed = Math.max(0, be.serverNow() - Number(st.startAt));
   return `<section class="card">
-    ${head('Step 4', '対戦中', `<span class="chip">${counting ? 'カウントダウン中' : 'LIVE'}</span>`)}
-    <p class="step-desc">${st.game === 'quiz' ? '1問ずつ「出題」→「正解を発表」を繰り返します。' : '代表者全員が「完了」になったら、下の「ゲーム終了・集計へ」を押します。'}記録の数字は集計まで見えません。</p>
+    ${head('Step 4', '対戦中・実況モニター', `<span class="chip">${counting ? 'カウントダウン中' : `LIVE ${(elapsed / 1000).toFixed(1)}秒`}</span>`)}
+    <p class="step-desc">${st.game === 'quiz' ? '1問ずつ「出題」→「正解を発表」を繰り返します。' : '代表者全員が「完了」になったら、下の「ゲーム終了・集計へ」を押します。'}<b>記録はこの画面（司会）にだけ</b>表示されています。参加者には結果発表まで見えません。</p>
     ${repMonitor(st, statusFn, true)}
     <p class="fine">「再挑戦を許可」：通信切れや誤操作のとき、その代表者の今回の記録を消してもう一度挑戦させます${st.game === 'quiz' ? '（クイズは表示中の問題のみ）' : ''}。</p>
     ${quizCtl}
     ${st.game !== 'quiz' ? mcHTML([allDone ? '全員終了！ 集計に入ります。' : 'がんばれー！'], allDone ? '全員の記録が届きました。' : '「完了」になっていない代表者がいる間は、そのまま見守ります。') : ''}
     <button class="btn ${allDone ? 'btn-primary' : 'btn-ghost'} btn-xl" data-act="finish">ゲーム終了・集計へ <span class="arr">→</span></button>
   </section>`;
+}
+
+/** 司会用の実況：各代表の動きと記録（司会の画面にだけ出す） */
+function liveStatus(st, u) {
+  const p = D.prog?.[u] || {};
+  const res = D.subs?.[u]?.res;
+  const sec = ms => (Number(ms) / 1000).toFixed(2);
+  const elapsed = Math.max(0, be.serverNow() - Number(st.startAt));
+  if (st.game === 'quiz') {
+    const q = st.quiz || {};
+    const n = Number(q.total) || 0;
+    const answers = L.arr(D.quizRun).map(x => Number(x.answer));
+    let correct = 0;
+    const dots = Array.from({ length: n }, (_, i) => {
+      const a = D.subs?.[u]?.['q' + i];
+      const revealed = i < Number(q.idx) || (i === Number(q.idx) && !q.open);
+      const ok = a && Number(a.c) === answers[i];
+      if (ok) correct++;
+      const cls = !a ? (p['g' + i] ? 'seen' : '') : revealed ? (ok ? 'on' : 'ng') : 'ans';
+      return `<span class="qdot ${cls}">${i + 1}</span>`;
+    }).join('');
+    const cur = q.key ? D.subs?.[u]?.[q.key] : null;
+    const now = q.key ? (cur ? `<small class="mon-rec">${'ABCD'[cur.c] || '時間切れ'}${cur.c >= 0 ? `・${sec(cur.v)}秒` : ''} ${Number(cur.c) === answers[Number(q.idx)] ? '<b class="ok">正解</b>' : '<b class="ng">×</b>'}</small>` : (q.open ? '<small class="st-live">考え中…</small>' : '<small class="muted">無回答</small>')) : '';
+    return `${dots}${now}<small class="mon-rec">正解 ${correct}</small>`;
+  }
+  if (st.game === 'ten') {
+    if (res) { const d = Number(res.v) - L.TEN_TARGET; return `<b class="mon-rec">${sec(res.v)}秒</b><small class="muted">誤差${d >= 0 ? '+' : '−'}${sec(Math.abs(d))}</small>`; }
+    return p.go ? `<span class="st-live">計測中 ${(elapsed / 1000).toFixed(1)}秒</span>` : '<span class="muted">待機</span>';
+  }
+  if (st.game === 'touch') {
+    const n = Math.min(L.TOUCH_N, Number(D.live?.[u] || 0));
+    if (res) return Number(res.n) >= L.TOUCH_N ? `<b class="mon-rec">ゴール ${sec(res.v)}秒</b>` : `<b class="mon-rec">時間切れ ${res.n}/${L.TOUCH_N}</b>`;
+    return p.go ? `<span class="st-live">${n} / ${L.TOUCH_N}</span>` : '<span class="muted">待機</span>';
+  }
+  if (st.game === 'tap') {
+    if (res) return `<b class="mon-rec">${res.v}回</b>`;
+    return p.go ? `<span class="st-live">連打中 ${Number(D.live?.[u] || 0)}回</span>` : '<span class="muted">待機</span>';
+  }
+  if (st.game === 'iai') {
+    if (res) return res.f ? '<b class="ng">フライング</b>' : `<b class="mon-rec">反応 ${sec(res.v)}秒</b>`;
+    return p.go ? '<span class="st-live">構え中</span>' : '<span class="muted">待機</span>';
+  }
+  return p.res ? '<span class="ok">完了</span>' : p.go ? '<span class="st-live">プレイ中</span>' : '<span class="muted">待機</span>';
 }
 
 function computePreview(st) {
@@ -791,7 +829,16 @@ const ACTIONS = {
     const answered = reps.filter(u => D.prog?.[u]?.[q.key]).length;
     const left = Number(q.at) + L.QUIZ_LIMIT - be.serverNow();
     if (answered < reps.length && left > 0 && !confirm(`まだ${reps.length - answered}人が回答していません（残り${Math.ceil(left / 1000)}秒）。締め切って正解を発表しますか？`)) return;
-    await be.update({ 'state/quiz/open': false, 'state/quiz/reveal': Number(src.answer), 'state/quiz/note': src.note || null, 'state/updatedAt': be.TS });
+    // 1問ごとの結果（○×・選んだ答え・回答時間・それまでの正解数）を全員に配る
+    const answers = L.arr(D.quizRun).map(x => Number(x.answer));
+    const res = {};
+    for (const [t, u] of Object.entries(st.reps || {})) {
+      const a = D.subs?.[u]?.[q.key];
+      let tot = 0;
+      for (let i = 0; i <= Number(q.idx); i++) { const x = D.subs?.[u]?.['q' + i]; if (x && Number(x.c) === answers[i]) tot++; }
+      res[t] = a ? { c: Number(a.c), v: Math.round(Number(a.v) || 0), ok: Number(a.c) === Number(src.answer), tot } : { c: -1, ok: false, tot };
+    }
+    await be.update({ 'state/quiz/open': false, 'state/quiz/reveal': Number(src.answer), 'state/quiz/note': src.note || null, 'state/quiz/res': res, 'state/updatedAt': be.TS });
     if (src.id && D.quizBank?.[src.id]) be.set(`quizBank/${src.id}/used`, true).catch(() => {});
   },
   async retryOne(b) {

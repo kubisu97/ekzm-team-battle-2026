@@ -1,7 +1,7 @@
 // リハーサルモード：管理画面だけで「ダミー参加者」を動かし、1人でも本番と同じ流れを試せるようにする。
 // ダミーは参加者アカウントを作らず、管理者の権限で書き込む（uid が 'rh_' で始まるものがダミー）。
 // ダミーを動かすのは、リハーサルを開始した管理画面（開いている間だけ動く）。
-import * as L from './logic.js?v=7';
+import * as L from './logic.js?v=10';
 
 export const isDummy = uid => String(uid || '').startsWith('rh_');
 export const RH_PREFIX = 'rh_';
@@ -167,8 +167,13 @@ export function createDriver(be, D, { onError = () => {} } = {}) {
       done.add(`play|${run}|${u}`);
       at(start, () => stillRunning(run) && be.set(`prog/${run}/${u}/go`, true));
       if (st.game === 'ten') {
-        const v = 10000 + Math.round(rand(-1300, 1300));
+        const v = L.TEN_TARGET + Math.round(rand(-2600, 2600));
         at(start + v, () => submit(run, u, 'res', { v }));
+      } else if (st.game === 'touch') {
+        // 1つ押すのに 0.9〜2.2 秒。進み具合をライブで送り、16まで押したらゴール
+        const per = rand(900, 2200);
+        for (let n = 1; n <= L.TOUCH_N; n++) at(start + n * per, () => stillRunning(run) && be.set(`live/${run}/${u}`, n));
+        at(start + L.TOUCH_N * per + 150, () => submit(run, u, 'res', { v: Math.round(L.TOUCH_N * per), n: L.TOUCH_N }));
       } else if (st.game === 'iai') {
         const go = start + Number(st.iaiDelay || 0);
         if (Math.random() < 0.08) at(go - 300, () => submit(run, u, 'res', { v: 0, f: true }));
