@@ -86,8 +86,8 @@
         "$uid": {
           ".read": "auth != null && auth.uid === $uid",
           "$k": {
-            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('state/runId').val() === $run && root.child('state/phase').val() === 'running' && root.child('state/repOf').child($uid).exists() && (($k === 'res' && root.child('state/game').val() !== 'quiz') || ($k.matches(/^q[0-4]$/) && root.child('state/game').val() === 'quiz' && root.child('state/quiz/key').val() === $k && root.child('state/quiz/open').val() === true))",
-            ".validate": "newData.hasChildren(['v','at']) && newData.child('at').val() === now && (root.child('state/game').val() !== 'tap' || newData.child('v').val() <= 250)",
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('state/runId').val() === $run && root.child('state/phase').val() === 'running' && root.child('state/repOf').child($uid).exists() && (($k === 'res' && root.child('state/game').val() !== 'quiz') || ($k.matches(/^q[0-9]$/) && root.child('state/game').val() === 'quiz' && root.child('state/quiz/key').val() === $k && root.child('state/quiz/open').val() === true))",
+            ".validate": "newData.hasChildren(['v','at']) && newData.child('at').val() === now && (root.child('state/game').val() !== 'tap' || newData.child('v').val() <= 400)",
             "v": {
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 120000"
             },
@@ -99,6 +99,9 @@
             },
             "at": {
               ".validate": "newData.isNumber()"
+            },
+            "n": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 16"
             },
             "$other": {
               ".validate": false
@@ -114,7 +117,7 @@
         "$uid": {
           "$k": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('state/runId').val() === $run && root.child('state/repOf').child($uid).exists() && (root.child('state/phase').val() === 'running' || ($k === 'ok' && root.child('state/phase').val() === 'ready'))",
-            ".validate": "newData.val() === true && $k.matches(/^(ok|go|res|g[0-4]|q[0-4])$/)"
+            ".validate": "newData.val() === true && $k.matches(/^(ok|go|res|g[0-9]|q[0-9])$/)"
           }
         }
       }
@@ -124,8 +127,8 @@
       ".write": "auth != null && auth.uid === 'uBDBPDOsN9OphJoSg1KHAIXonSA2'",
       "$run": {
         "$uid": {
-          ".write": "auth != null && auth.uid === $uid && root.child('state/runId').val() === $run && root.child('state/phase').val() === 'running' && root.child('state/game').val() === 'tap' && root.child('state/repOf').child($uid).exists()",
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 250 && (!data.exists() || newData.val() >= data.val())"
+          ".write": "auth != null && auth.uid === $uid && root.child('state/runId').val() === $run && root.child('state/phase').val() === 'running' && (root.child('state/game').val() === 'tap' || root.child('state/game').val() === 'touch') && root.child('state/repOf').child($uid).exists()",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 400 && (!data.exists() || newData.val() >= data.val())"
         }
       }
     },
