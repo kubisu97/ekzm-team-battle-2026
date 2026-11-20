@@ -46,6 +46,11 @@ const overflowX = p => p.evaluate(() => document.documentElement.scrollWidth > M
   check((await get('config/rehearsal')) === true, 'リハーサル中フラグ');
   check((await admin.textContent('.rh-bar')).includes('リハーサル中'), '管理画面にリハーサル中の帯');
   check(await admin.$('[data-tab="control"].on') !== null, '開始後は進行タブに移る');
+  // 説明スライドを出している間は、ダミーは立候補しない
+  await admin.click('[data-act="explainOpen"][data-key="opening"]');
+  await sleep(7000);
+  check(!(await get('pick')), '説明中はダミーが立候補しない');
+  await admin.click('[data-act="explainClose"]'); await sleep(300);
   // 本物の参加者（手伝いの幹事）も一緒に参加できる
   const helper = await newPage(browser, 'helper', 'iPhone SE');
   await helper.goto(BASE + '/index.html?mock&p=helper');
