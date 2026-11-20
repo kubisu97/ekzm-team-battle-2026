@@ -6,7 +6,8 @@ const members = { a: { name: 'A子', team: 'A' }, b: { name: 'B男', team: 'B' }
 const reps = { A: 'a', B: 'b', C: 'c', D: 'd', E: 'e' };
 
 test('10秒：誤差の小さい順、同誤差は同順位・同得点、次は飛ばす', () => {
-  const subs = { a: { res: { v: 10050 } }, b: { res: { v: 9950 } }, c: { res: { v: 10500 } }, d: { res: { v: 11000 } }, e: { res: { v: 8000 } } };
+  const T = L.TEN_TARGET;
+  const subs = { a: { res: { v: T + 50 } }, b: { res: { v: T - 50 } }, c: { res: { v: T + 500 } }, d: { res: { v: T + 1000 } }, e: { res: { v: T - 2000 } } };
   const r = L.rankRows('ten', L.buildRows('ten', reps, members, subs), 1);
   assert.equal(r.A.rank, 1); assert.equal(r.B.rank, 1);
   assert.equal(r.A.pts, 100); assert.equal(r.B.pts, 100);
@@ -36,7 +37,7 @@ test('居合：フライング・100ms未満は失格0点、速い順', () => {
 test('連打：多い順・同数は同順位、2倍', () => {
   const subs = { a: { res: { v: 60 } }, b: { res: { v: 72 } }, c: { res: { v: 72 } }, d: { res: { v: 55 } }, e: { res: { v: 999 } } };
   const r = L.rankRows('tap', L.buildRows('tap', reps, members, subs), 2);
-  assert.equal(r.E.rank, 1); assert.equal(r.E.pts, 200); // 999 は 250 に丸め
+  assert.equal(r.E.rank, 1); assert.equal(r.E.pts, 200); // 999 は上限に丸め
   assert.equal(r.B.rank, 2); assert.equal(r.C.rank, 2); assert.equal(r.B.pts, 140); assert.equal(r.C.pts, 140);
   assert.equal(r.A.rank, 4); assert.equal(r.A.pts, 60);
   assert.equal(r.D.rank, 5); assert.equal(r.D.pts, 20);
@@ -58,7 +59,7 @@ test('クイズ：正解数→正解時間合計、誤答は下位、全問誤�
 });
 
 test('管理者の手動修正（順位指定・失格）', () => {
-  const subs = { a: { res: { v: 10000 } }, b: { res: { v: 10100 } } };
+  const subs = { a: { res: { v: L.TEN_TARGET } }, b: { res: { v: L.TEN_TARGET + 100 } } };
   const r = L.rankRows('ten', L.buildRows('ten', { A: 'a', B: 'b' }, members, subs), 1, { A: 'dq', B: '1' });
   assert.equal(r.A.pts, 0); assert.equal(r.A.rank, null); assert.equal(r.B.rank, 1); assert.equal(r.B.pts, 100);
 });
@@ -97,4 +98,14 @@ test('個人賞：応援団長賞・声援王・記録の賞（発表済みの�
   const tie = L.computeAwards({ results, cheer: { a: { u1: { A: 5 }, u2: { B: 5 } } }, members })[0];
   assert.equal(tie.winners.length, 2, '同数は2人とも受賞');
   assert.equal(L.computeAwards({ results: {}, cheer: {}, members })[0].winners.length, 0, '記録がなければ該当なし');
+});
+
+test('数字タッチ：ゴールした人は速い順、時間切れは押せた数の順でその下', () => {
+  const subs = { a: { res: { v: 21000, n: 16 } }, b: { res: { v: 60000, n: 12 } }, c: { res: { v: 15500, n: 16 } }, d: { res: { v: 60000, n: 12 } }, e: { res: { v: 60000, n: 14 } } };
+  const r = L.rankRows('touch', L.buildRows('touch', reps, members, subs), 1);
+  assert.equal(r.C.rank, 1); assert.equal(r.A.rank, 2); assert.equal(r.E.rank, 3);
+  assert.equal(r.B.rank, 4); assert.equal(r.D.rank, 4, '同じ数なら同順位');
+  assert.match(r.C.detail, /15\.50秒/); assert.match(r.B.detail, /12\/16/);
+  assert.equal(L.touchBoard('x').join(), L.touchBoard('x').join(), '同じ runId なら同じ並び');
+  assert.deepEqual([...L.touchBoard('x')].sort((p, q) => p - q), Array.from({ length: 16 }, (_, i) => i + 1));
 });

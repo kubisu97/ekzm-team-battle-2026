@@ -96,9 +96,10 @@ test('連打のライブ値', () => {
   ok(w('u1', { 'live/run4/u1': 10 }), 'live');
   ok(w('u1', { 'live/run4/u1': 25 }), 'live 増加');
   ng(w('u1', { 'live/run4/u1': 20 }), 'live 減少不可');
-  ng(w('u1', { 'live/run4/u1': 300 }), 'live 上限');
+  ok(w('u1', { 'live/run4/u1': 300 }), '15秒なので 300 回までは OK');
+  ng(w('u1', { 'live/run4/u1': 450 }), 'live 上限（400）');
   ng(w('u2', { 'live/run4/u2': 5 }), '代表外 live 不可');
-  ng(w('u1', { 'subs/run4/u1/res': { v: 400, at: TS } }), 'tap は 250 回まで');
+  ng(w('u1', { 'subs/run4/u1/res': { v: 401, at: TS } }), 'tap は 400 回まで');
   ok(w('u1', { 'subs/run4/u1/res': { v: 88, at: TS }, 'prog/run4/u1/res': true }), 'tap 提出');
 });
 
@@ -146,4 +147,19 @@ test('応援ボタン（観戦中の人だけ・増える方向だけ）', () =>
   ng(w('u2', { 'cheer/run9/u2/A': 20 }), '結果発表後は応援できない');
   assert.equal(evaluateRead(RULES, db, 'cheer/run9', auth('u3')), true, '応援数はみんな見られる');
   ok(w(ADMIN, { cheer: null }), '管理者はリセットできる');
+});
+
+test('数字タッチ：進み具合のライブと、記録（時間＋押せた数）', () => {
+  ok(w(ADMIN, { state: { round: 3, game: 'touch', phase: 'running', mult: 1, runId: 'run3t', reps: { A: 'u1' }, repOf: { u1: 'A' }, startAt: Date.now(), updatedAt: TS } }), 'touch 開始');
+  ok(w('u1', { 'live/run3t/u1': 5 }), '進み具合のライブ');
+  ng(w('u1', { 'live/run3t/u1': 3 }), '進み具合は戻らない');
+  ng(w('u2', { 'live/run3t/u2': 5 }), '代表外は送れない');
+  ng(w('u1', { 'subs/run3t/u1/res': { v: 21000, n: 20, at: TS } }), '押せた数は16まで');
+  ok(w('u1', { 'subs/run3t/u1/res': { v: 21000, n: 16, at: TS }, 'prog/run3t/u1/res': true }), '記録');
+});
+
+test('クイズ：10問目（q9）まで回答できる', () => {
+  ok(w(ADMIN, { state: { round: 2, game: 'quiz', phase: 'running', mult: 1, runId: 'run2b', reps: { A: 'u1' }, repOf: { u1: 'A' }, startAt: Date.now(), quiz: { total: 10, idx: 9, key: 'q9', open: true, at: Date.now() }, updatedAt: TS } }), '第10問');
+  ok(w('u1', { 'prog/run2b/u1/g9': true }), '表示フラグ g9');
+  ok(w('u1', { 'subs/run2b/u1/q9': { v: 3000, c: 1, at: TS }, 'prog/run2b/u1/q9': true }), '第10問に回答');
 });

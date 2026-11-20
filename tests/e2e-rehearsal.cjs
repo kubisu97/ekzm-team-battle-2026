@@ -86,10 +86,10 @@ const overflowX = p => p.evaluate(() => document.documentElement.scrollWidth > M
   await admin.click('#pvBack'); await sleep(200);
   await admin.click('[data-act="start"]');
   await admin.click('[data-act="rhPreview"]');
-  await sleep(4000 + 9800);
+  await sleep(4000 + 19800);
   await fr.locator('#stopBtn').click({ force: true });
   await helper.click('#stopBtn', { force: true });
-  await sleep(2000);
+  await sleep(3500);
   await shot(admin, 'R3-preview-ten');
   const subs1 = await get(`subs/${st1.runId}`);
   check(Object.values(st1.reps).every(u => subs1?.[u]?.res), '全チームの記録が届く（ダミー含む）');
@@ -120,7 +120,7 @@ const overflowX = p => p.evaluate(() => document.documentElement.scrollWidth > M
   await admin.click('[data-act="next"]'); await sleep(400);
 
   // ⑤ GAME 3・4 はダミーだけ（自分たちは立候補しない）
-  for (const g of ['iai', 'tap']) {
+  for (const g of ['touch', 'tap']) {
     check(await waitFor(async () => { const p = await get('pick'); return p && L5(p); }, 30000), `${g}：全チームの代表がそろう`);
     await admin.click('[data-act="announce"]'); await sleep(3500);
     await admin.click('[data-act="start"]');
@@ -129,7 +129,7 @@ const overflowX = p => p.evaluate(() => document.documentElement.scrollWidth > M
       await helper.waitForSelector('#cheerBar');
       for (let i = 0; i < 12; i++) { await helper.click('.cheer-btn[data-t="B"]'); await sleep(90); }
     }
-    await sleep(4000 + (g === 'iai' ? Number(st.iaiDelay) + 1500 : 8000) - (g === 'tap' ? 1300 : 0));
+    await sleep(4000 + (g === 'touch' ? 2200 * 16 + 800 : 15800) - (g === 'tap' ? 1300 : 0));
     if (g === 'tap') {
       const live = await get(`live/${st.runId}`);
       check(live && Object.keys(live).length === 5, '連打：ダミーのライブ連打数が流れる');

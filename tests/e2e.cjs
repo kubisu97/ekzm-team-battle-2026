@@ -124,21 +124,19 @@ async function shot(p, name) { await p.screenshot({ path: `${SHOTS}/${name}.png`
     if (game === 'ten') {
       await sleep(4300);
       await shot(repPages[0].pl.p, `r${round}-c-rep-play`);
-      await Promise.all(repPages.map(async (r, i) => { await sleep(8500 + i * 400); await r.pl.p.click('#stopBtn'); }));
+      await Promise.all(repPages.map(async (r, i) => { await sleep(18500 + i * 400); await r.pl.p.click('#stopBtn'); }));
       await shot(spec.p, `r${round}-c-spec`);
-    } else if (game === 'iai') {
+    } else if (game === 'touch') {
       await sleep(4300);
-      await shot(repPages[0].pl.p, `r${round}-c-rep-kamae`);
-      const st2 = await repsOf();
-      await sleep(Number(st2.iaiDelay) + 50);
-      await shot(spec.p, `r${round}-c-spec-kire`);
-      // 1人はフライング、他は反応
-      await repPages[0].pl.p.click('#iaiArea').catch(() => {});
-      await Promise.all(repPages.slice(1).map(async (r, i) => { await sleep(150 + i * 60); await r.pl.p.click('#iaiArea', { force: true }); }));
+      // 全員が 1→16 を順番にタップ（1人目はわざと間違いも押す）
+      await repPages[0].pl.p.click('.tcell[data-n="5"]');
+      await Promise.all(repPages.map(async (r, i) => {
+        for (let n = 1; n <= 16; n++) { await r.pl.p.click(`.tcell[data-n="${n}"]`); await sleep(60 + i * 25); if (n === 8 && i === 0) await shot(r.pl.p, `r${round}-c-rep-touch`); }
+      }));
       await sleep(300);
-      await shot(repPages[1].pl.p, `r${round}-c-rep-zan`);
-      await sleep(1600);
-      await shot(spec.p, `r${round}-c-spec-after`);
+      await shot(spec.p, `r${round}-c-spec-touch`);
+      const goal = await repPages[1].pl.p.textContent('.touch-next');
+      console.log('touch goal text:', goal.trim());
     } else if (game === 'tap') {
       await sleep(4200);
       const t0 = Date.now();
@@ -147,13 +145,14 @@ async function shot(p, name) { await p.screenshot({ path: `${SHOTS}/${name}.png`
         for (let k = 0; k < n; k++) { await r.pl.p.dispatchEvent('#tapPad', 'pointerdown'); await sleep(40); }
       }));
       await shot(spec.p, `r${round}-c-spec-live`);
-      await sleep(Math.max(0, 5600 - (Date.now() - t0)));
+      await sleep(Math.max(0, 13600 - (Date.now() - t0)));
       await shot(spec.p, `r${round}-c-spec-hidden`);
       await shot(repPages[0].pl.p, `r${round}-c-rep-tap`);
       await sleep(2500);
     } else if (game === 'quiz') {
       await sleep(4300);
-      for (let q = 0; q < 3; q++) {
+      const total = Number((await repsOf()).quiz?.total) || 3;
+      for (let q = 0; q < total; q++) {
         await admin.click('[data-act="quizNext"]');
         await sleep(3200);
         if (q === 0) { await shot(repPages[0].pl.p, `r${round}-c-rep-q`); await shot(spec.p, `r${round}-c-spec-q`); await shot(admin, `r${round}-c-admin-q`); }
@@ -161,7 +160,11 @@ async function shot(p, name) { await p.screenshot({ path: `${SHOTS}/${name}.png`
         await sleep(500);
         await admin.click('[data-act="quizReveal"]');
         await sleep(800);
-        if (q === 0) await shot(repPages[0].pl.p, `r${round}-c-rep-reveal`);
+        if (q === 0) {
+          await shot(repPages[0].pl.p, `r${round}-c-rep-reveal`);
+          const rows = await spec.p.$$eval('#qRes li', els => els.length).catch(() => 0);
+          console.log('quiz per-question result rows:', rows);
+        }
       }
     }
     await sleep(500);

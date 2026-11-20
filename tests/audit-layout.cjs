@@ -111,7 +111,7 @@ async function snap(p, step, full = true) {
   await admin.click('[data-tab="control"]');
 
   const get = async q => (await (await fetch(BASE + '/__mock/get?path=' + q)).json()).value;
-  const games = ['ten', 'quiz', 'iai', 'tap'];
+  const games = ['ten', 'quiz', 'touch', 'tap'];
   for (let round = 1; round <= 4; round++) {
     const g = games[round - 1];
     for (let t = 0; t < 5; t++) { const p = players[((round - 1) % 2) * 5 + t]; await p.waitForSelector('#pickBtn'); await p.click('#pickBtn'); }
@@ -133,22 +133,21 @@ async function snap(p, step, full = true) {
     if (g === 'ten') {
       for (const p of repPages) await snap(p, `R${round}-4-rep`, false);
       await snap(specPages[0], `R${round}-4-spec`);
-      await sleep(5000);
+      await sleep(15000);
       for (const p of repPages) await p.click('#stopBtn');
-    } else if (g === 'iai') {
+    } else if (g === 'touch') {
+      for (const p of repPages) for (let n = 1; n <= 7; n++) await p.click(`.tcell[data-n="${n}"]`);
       for (const p of repPages) await snap(p, `R${round}-4-rep`, false);
-      const s2 = await get('state'); await sleep(Number(s2.iaiDelay) + 100);
-      await snap(specPages[0], `R${round}-4-spec`);
-      for (const p of repPages) await p.click('#iaiArea', { force: true });
+      await sleep(400); await snap(specPages[0], `R${round}-4-spec`);
+      for (const p of repPages) for (let n = 8; n <= 16; n++) await p.click(`.tcell[data-n="${n}"]`);
       await sleep(400); for (const p of repPages) await snap(p, `R${round}-5-rep-after`, false);
-      await sleep(1500);
     } else if (g === 'tap') {
       for (const p of repPages) { for (let k = 0; k < 15; k++) await p.dispatchEvent('#tapPad', 'pointerdown'); }
       for (const p of repPages) await snap(p, `R${round}-4-rep`, false);
       await snap(specPages[0], `R${round}-4-spec`);
-      await sleep(4500);
+      await sleep(12500);
     } else {
-      for (let q = 0; q < 3; q++) {
+      for (let q = 0; q < 3; q++) { // 7問のうち3問だけ出して集計へ
         await admin.click('[data-act="quizNext"]'); await sleep(3200);
         if (q === 0) { for (const p of repPages) await snap(p, `R${round}-4-rep`, false); await snap(specPages[0], `R${round}-4-spec`); await snap(admin, `R${round}-A3-quiz`); }
         for (const [i, p] of repPages.entries()) await p.click(`.q-choice.c${(i + q) % 4}`);

@@ -1,4 +1,4 @@
-// 例外系の通し試験：フライング、途中リロード→再挑戦許可、やり直し、受付締切、削除
+// 例外系の通し試験：数字タッチ（同じ並び・押し間違い）、途中リロード→再挑戦許可、やり直し、受付締切、削除
 const { chromium, devices } = require('playwright');
 const BASE = 'http://localhost:8080';
 const SHOTS = require('path').join(__dirname, 'shots');
@@ -34,8 +34,8 @@ const uidOf = p => p.evaluate(() => { for (let i = 0; i < sessionStorage.length;
     await p.waitForSelector('#lobbyMain');
     P[t] = { p, uid: await uidOf(p) };
   }
-  // 居合斬り
-  await admin.selectOption('#gameSel', 'iai');
+  // 数字タッチ
+  await admin.selectOption('#gameSel', 'touch');
   await sleep(300);
   // 立候補→交代→辞退→再立候補
   await P.A.p.click('#pickBtn'); await sleep(300);
@@ -49,37 +49,43 @@ const uidOf = p => p.evaluate(() => { for (let i = 0; i < sessionStorage.length;
   for (const t of TEAMS) await P[t].p.click('#okBtn');
   await sleep(300);
   await admin.click('[data-act="start"]');
-  await sleep(4400); // 構え表示中
-  await P.A.p.click('#iaiArea'); // フライング
-  await sleep(200);
-  check((await P.A.p.textContent('#iaiText')).includes('フライング'), 'A: 構え中のタップでフライング表示');
+  await sleep(1500);
+  check(await P.A.p.evaluate(() => [...document.querySelectorAll('.tcell')].every(b => b.textContent === '?')), 'A: スタート前は数字が見えない');
+  await sleep(3000);
+  const board = await P.A.p.evaluate(() => [...document.querySelectorAll('.tcell')].map(b => Number(b.textContent)));
+  const board2 = await P.C.p.evaluate(() => [...document.querySelectorAll('.tcell')].map(b => Number(b.textContent)));
+  check(board.join() === board2.join() && [...board].sort((a, b) => a - b).join() === Array.from({ length: 16 }, (_, i) => i + 1).join(), '全員同じ並び（1〜16）');
+  // A：間違った数字は進まない
+  await P.A.p.click('.tcell[data-n="3"]'); await sleep(100);
+  check((await P.A.p.textContent('#tNext')) === '1', 'A: 違う数字を押しても進まない');
+  for (let n = 1; n <= 5; n++) await P.A.p.click(`.tcell[data-n="${n}"]`);
+  check((await P.A.p.textContent('#tNext')) === '6', 'A: 正しい順に押すと進む');
   await P.B.p.reload(); // 途中リロード
   await P.B.p.waitForSelector('.warn h2');
   check((await P.B.p.textContent('#app')).includes('挑戦が中断されました'), 'B: 途中リロードでロック表示');
   await shot(P.B.p, 'edge-locked');
   const st = await get('state');
-  await sleep(Math.max(0, Number(st.startAt) + Number(st.iaiDelay) - Date.now()) + 300);
-  for (const t of ['C', 'D', 'E']) await P[t].p.click('#iaiArea', { force: true });
+  for (const t of ['A', 'C', 'D', 'E']) for (let n = t === 'A' ? 6 : 1; n <= 16; n++) await P[t].p.click(`.tcell[data-n="${n}"]`);
   await sleep(500);
   // 管理者が B に再挑戦を許可
   await admin.click(`[data-act="retryOne"][data-uid="${P.B.uid}"]`);
-  await P.B.p.waitForSelector('#iaiArea', { timeout: 5000 });
+  await P.B.p.waitForSelector('.tcell', { timeout: 5000 });
   check(true, 'B: 再挑戦許可で画面が戻る');
-  await sleep(3300 + Number(st.iaiDelay) + 300);
-  await P.B.p.click('#iaiArea', { force: true });
+  await sleep(3500);
+  for (let n = 1; n <= 16; n++) await P.B.p.click(`.tcell[data-n="${n}"]`);
   await sleep(600);
   const subs = await get(`subs/${st.runId}`);
-  check(subs[P.A.uid]?.res?.f === true, 'A: フライングが記録された');
-  check(subs[P.B.uid]?.res && subs[P.B.uid].res.f === false, 'B: 再挑戦の記録が届いた');
+  check(subs[P.A.uid]?.res?.n === 16, 'A: ゴールが記録された');
+  check(subs[P.B.uid]?.res?.n === 16, 'B: 再挑戦の記録が届いた');
   // 二重送信（ブラウザから直接）→ 拒否
   const dup = await P.C.p.evaluate(async ({ run, uid }) => {
-    const r = await fetch('/__mock/write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op: 'update', uid, value: { [`subs/${run}/${uid}/res`]: { v: 1, at: { '.sv': 'timestamp' } } } }) });
+    const r = await fetch('/__mock/write', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op: 'update', uid, value: { [`subs/${run}/${uid}/res`]: { v: 1, n: 16, at: { '.sv': 'timestamp' } } } }) });
     return r.status;
   }, { run: st.runId, uid: P.C.uid });
   check(dup === 403, 'C: 同じラウンドの二重送信は拒否');
   await admin.click('[data-act="finish"]'); await sleep(500);
   const judging = await admin.textContent('#tabBody');
-  check(/失格/.test(judging) || /フライング/.test(judging), '集計画面に失格が表示');
+  check(/タイム/.test(judging), '集計画面にタイムが表示');
   await shot(admin, 'edge-judging');
   // 手動修正：Aを3位に
   await admin.selectOption('.ovr[data-team="A"]', '3'); await sleep(300);
