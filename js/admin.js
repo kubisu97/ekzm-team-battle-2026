@@ -2,7 +2,7 @@
 import { createBackend, errMsg } from './db.js?v=7';
 import * as L from './logic.js?v=7';
 import { sfx, isMuted, setMuted, wantAwake } from './fx.js?v=7';
-import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=7';
+import { addDummies, endRehearsalUpdate, createDriver, isDummy } from './rehearsal.js?v=8';
 import { $, $$, esc, tvars, teamBadge, toast, scoreboardHTML, rosterHTML, head, gameTag, ICON, detailHTML, explainSlideHTML, explainName } from './ui.js?v=7';
 import qrcode from './vendor/qrcode.mjs?v=7';
 

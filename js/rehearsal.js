@@ -81,17 +81,28 @@ export function createDriver(be, D, { onError = () => {} } = {}) {
     });
   }
 
+  /**
+   * 待機中：代表が決まっていないチームは、ダミーが立候補する。
+   * ・説明スライドを出している間は立候補しない（みんなが説明を聞いているため）
+   * ・本物の参加者がいるチームは、説明が終わってから20秒待つ（あとから参加した人がいても同じ）
+   */
+  let quietSince = 0;
   function lobby(st) {
+    if (st.explain?.key) { quietSince = 0; return; }
+    if (!quietSince) quietSince = Date.now();
     for (const t of L.TEAMS) {
       if (validPick(t)) continue;
       const ms = Object.entries(D.members || {}).filter(([, m]) => m.team === t);
-      const dummies = ms.filter(([u]) => isDummy(u)).map(([u]) => u);
-      if (!dummies.length) continue;
-      // 本物の参加者がいるチームは、その人が立候補するのを20秒待つ
+      if (!ms.some(([u]) => isDummy(u))) continue;
       const hasReal = ms.some(([u]) => !isDummy(u));
-      once(`pick|${st.round}|${t}`, hasReal ? 20000 : rand(2000, 6000), async () => {
+      const key = `pick|${st.round}|${t}`;
+      const wait = hasReal ? Math.max(500, 20000 - (Date.now() - quietSince)) : rand(2000, 6000);
+      once(key, wait, async () => {
         const s = D.state;
         if (s?.phase !== 'lobby' || s.round !== st.round || validPick(t)) return;
+        const realNow = Object.entries(D.members || {}).some(([u, m]) => m.team === t && !isDummy(u));
+        // 説明が始まった・本物の参加者があとから来た → いったん取り消して、次の確認で数え直す
+        if (s.explain?.key || (realNow && Date.now() - quietSince < 20000)) { done.delete(key); return; }
         const pool = Object.entries(D.members || {}).filter(([u, m]) => isDummy(u) && m.team === t).map(([u]) => u);
         const fresh = pool.filter(u => !D.used?.[u]);
         const list = fresh.length ? fresh : pool;
@@ -176,7 +187,7 @@ export function createDriver(be, D, { onError = () => {} } = {}) {
     const st = D.state;
     if (!D.config?.rehearsal || !st) { if (phaseKey) { clear(); phaseKey = ''; } return; }
     const k = `${st.phase}|${st.runId || ''}|${st.round}`;
-    if (k !== phaseKey) { clear(); phaseKey = k; }
+    if (k !== phaseKey) { clear(); phaseKey = k; quietSince = 0; }
     if (st.phase === 'lobby') lobby(st);
     else if (st.phase === 'ready') ready(st);
     else if (st.phase === 'running') running(st);
